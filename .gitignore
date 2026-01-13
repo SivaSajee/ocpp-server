@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Optional: Uncomment if you want to exclude charging history from version control
+# charging_history.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

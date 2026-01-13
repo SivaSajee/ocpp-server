@@ -1,0 +1,26 @@
+{
+    "name": "ocpp-server",
+    "version": "1.0.0",
+    "description": "OCPP 1.6 WebSocket Server with Dashboard",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "keywords": [
+        "ocpp",
+        "websocket",
+        "ev-charging",
+        "server"
+    ],
+    "author": "",
+    "license": "ISC",
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "dependencies": {
+        "ws": "^8.14.2",
+        "mongodb": "^6.3.0",
+        "dotenv": "^16.4.5"
+    }
+}
