@@ -759,6 +759,32 @@
             transition: width 1s ease;
         }
 
+        /* --- HISTORY DOWNLOAD BUTTON --- */
+        .history-download-btn {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 8px;
+            cursor: pointer;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .history-download-btn:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .history-download-btn:active {
+            transform: translateY(0);
+        }
+
         /* --- DLB DASHBOARD STYLES --- */
         #dlbView {
             padding: 20px;
@@ -854,6 +880,11 @@
             color: #5d5fef;
             background: #fff;
             border-radius: 20px;
+            box-shadow: 0 0 20px rgba(93, 95, 239, 0.1);
+        }
+
+        .hub-node-center:hover {
+            transform: translate(-50%, -50%);
             box-shadow: 0 0 20px rgba(93, 95, 239, 0.1);
         }
 
@@ -1621,9 +1652,15 @@
                                 d="M 215 290 C 215 330, 310 285, 310 335" />
 
                             <!-- Flow Dots -->
-                            <circle id="dot-grid" class="flow-dot dot-grid" r="5">
-                                <animateMotion id="anim-grid" dur="2s" repeatCount="indefinite"
+                            <!-- Grid Import: Grid -> Hub (positive gridPower) -->
+                            <circle id="dot-grid-import" class="flow-dot dot-grid" r="5">
+                                <animateMotion id="anim-grid-import" dur="2s" repeatCount="indefinite"
                                     path="M 90 145 C 90 195, 185 150, 185 190" />
+                            </circle>
+                            <!-- Grid Export: Hub -> Grid (negative gridPower) -->
+                            <circle id="dot-grid-export" class="flow-dot dot-grid" r="5">
+                                <animateMotion id="anim-grid-export" dur="2s" repeatCount="indefinite"
+                                    path="M 185 190 C 185 150, 90 195, 90 145" />
                             </circle>
                             <circle id="dot-pv" class="flow-dot dot-pv" r="5">
                                 <animateMotion id="anim-pv" dur="2s" repeatCount="indefinite"
@@ -1931,7 +1968,14 @@
                             <h3>${displayName}</h3>
                             <p style="color: #6b7280; font-size: 13px;">${id}</p>
                         </div>
-                        <div style="color: #10b981; font-weight: 600;">View ></div>
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <button class="history-download-btn" onclick="event.stopPropagation(); downloadChargerHistory('${id}', '${displayName}')" title="Download History">
+                                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px;">
+                                    <path fill="currentColor" d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" />
+                                </svg>
+                            </button>
+                            <div style="color: #10b981; font-weight: 600;">View ></div>
+                        </div>
                     `;
                     container.appendChild(card);
                 });
@@ -1939,6 +1983,89 @@
                 console.error('Error fetching chargers for history:', error);
                 container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Failed to load chargers</div>';
             }
+        }
+
+        // Download charger history as CSV
+        async function downloadChargerHistory(chargerId, chargerName) {
+            try {
+                // Show loading state (optional - could add a spinner)
+                console.log(`📥 Downloading history for ${chargerId}...`);
+
+                // Fetch all sessions for this charger
+                const response = await fetch(`/api/history/download?chargerId=${chargerId}`);
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server error:', errorText);
+                    throw new Error(`Server returned ${response.status}: ${errorText}`);
+                }
+
+                const sessions = await response.json();
+                console.log('Received sessions:', sessions.length);
+
+                // Convert to CSV
+                const csvContent = convertToCSV(sessions);
+
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${chargerId}_charging_history.csv`);
+                link.style.visibility = 'hidden';
+
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                console.log(`✅ Downloaded ${sessions.length} sessions for ${chargerId}`);
+
+                // Show success message
+                if (sessions.length === 0) {
+                    alert(`No charging history found for ${chargerId}. Downloaded empty CSV file.`);
+                } else {
+                    alert(`✅ Downloaded ${sessions.length} charging sessions for ${chargerId}`);
+                }
+            } catch (error) {
+                console.error('Error downloading history:', error);
+                console.error('Error details:', error.message);
+                alert('Failed to download charging history. Please check the console for details.');
+            }
+        }
+
+        // Helper function to convert JSON to CSV
+        function convertToCSV(sessions) {
+            // Safety check: ensure sessions is an array
+            if (!Array.isArray(sessions)) {
+                console.error('convertToCSV received non-array:', typeof sessions, sessions);
+                return 'Date,Start Time,End Time,Duration (min),Energy (kWh)\n';
+            }
+
+            if (sessions.length === 0) {
+                return 'Date,Start Time,End Time,Duration (min),Energy (kWh)\n';
+            }
+
+            // CSV Headers
+            const headers = ['Date', 'Start Time', 'End Time', 'Duration (min)', 'Energy (kWh)'];
+            const csvRows = [headers.join(',')];
+
+            // Add data rows
+            sessions.forEach(session => {
+                const row = [
+                    session.date,
+                    session.startTime,
+                    session.endTime,
+                    session.duration,
+                    session.energy.toFixed(2)
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            return csvRows.join('\n');
         }
 
         // --- RENAME LOGIC (UPDATED) ---
@@ -3164,8 +3291,13 @@
             }
 
             // Sync Flow Dots visibility
-            if (document.getElementById('dot-grid')) {
-                document.getElementById('dot-grid').classList.toggle('active', dlbData.gridPower > 100);
+            // Grid: Show correct direction based on import/export
+            if (document.getElementById('dot-grid-import') && document.getElementById('dot-grid-export')) {
+                const isImporting = dlbData.gridPower > 100;  // Positive = importing from grid
+                const isExporting = dlbData.gridPower < -100; // Negative = exporting to grid
+
+                document.getElementById('dot-grid-import').classList.toggle('active', isImporting);
+                document.getElementById('dot-grid-export').classList.toggle('active', isExporting);
             }
             if (document.getElementById('dot-pv')) {
                 document.getElementById('dot-pv').classList.toggle('active', dlbData.pvPower > 100);

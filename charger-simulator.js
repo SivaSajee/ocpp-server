@@ -233,6 +233,43 @@ function handleMessage(message) {
         console.log(`⚙️ ChangeConfiguration: ${payload.key} = ${payload.value}`);
         ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
     }
+
+    // Handle GetConfiguration
+    else if (action === 'GetConfiguration') {
+        console.log(`🔍 GetConfiguration received`);
+        ws.send(JSON.stringify([3, uniqueId, {
+            configurationKey: [
+                { key: 'AuthorizeRemoteTxRequests', value: 'true', readonly: false },
+                { key: 'ChargeProfileMaxStackLevel', value: '10', readonly: true },
+                { key: 'ChargingScheduleAllowedChargingRateUnit', value: 'Current,Power', readonly: true },
+                { key: 'MaxChargingProfilesInstalled', value: '20', readonly: true },
+                { key: 'SupportedFeatureProfiles', value: 'Core,FirmwareManagement,LocalAuthListManagement,Reservation,SmartCharging,RemoteTrigger', readonly: true }
+            ]
+        }]));
+    }
+
+    // Handle SetChargingProfile (Z-BOX Workaround)
+    else if (action === 'SetChargingProfile') {
+        console.log(`⚡ SetChargingProfile received`);
+
+        // Check if this is a "stop" profile (0A or 0W limit)
+        const profile = payload.csChargingProfiles;
+        const limit = profile?.chargingSchedule?.chargingSchedulePeriod?.[0]?.limit;
+        const unit = profile?.chargingSchedule?.chargingRateUnit;
+
+        if (limit === 0) {
+            console.log(`🛑 STOP PROFILE DETECTED: 0${unit} limit - Stopping transaction...`);
+            ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
+
+            // Stop the transaction after accepting the profile
+            setTimeout(() => {
+                stopTransaction();
+            }, 1000);
+        } else {
+            console.log(`📊 Charging profile set: ${limit}${unit}`);
+            ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
+        }
+    }
 }
 
 // Start heartbeat

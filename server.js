@@ -4,6 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const { connectDB, saveChargingSession, getSessionsByPeriod } = require('./database');
 
+// Helper function to convert UTC to IST (UTC+5:30)
+function toIST(date) {
+    const utcDate = new Date(date);
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istDate = new Date(utcDate.getTime() + istOffset);
+    return istDate.toISOString().replace('Z', '+05:30');
+}
+
 const PORT = process.env.PORT || 9000;
 
 // Track current transaction ID for remote stop
@@ -17,6 +25,54 @@ const server = http.createServer(async (req, res) => {
             if (err) { res.writeHead(500); res.end('Error loading dashboard'); }
             else { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(data); }
         });
+    }
+    // Download history endpoint - Get all sessions for a specific charger
+    // IMPORTANT: This must come BEFORE /api/history to avoid incorrect matching
+    else if (req.url.startsWith('/api/history/download')) {
+        const urlParams = new URL(req.url, `http://localhost:${PORT}`).searchParams;
+        const chargerId = urlParams.get('chargerId');
+
+        if (!chargerId) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'chargerId parameter is required' }));
+            return;
+        }
+
+        try {
+            const { getDB } = require('./database');
+            const db = getDB();
+            const collection = db.collection('charging_sessions');
+
+
+            // Fetch all sessions for this charger, sorted by start time
+            const sessions = await collection
+                .find({ chargerId: chargerId })
+                .sort({ startTime: 1 })
+                .toArray();
+
+            console.log(`📊 Found ${sessions.length} sessions for ${chargerId}`);
+
+            // Format sessions for CSV download
+            const formattedSessions = sessions.map(session => ({
+                date: session.startTime ? session.startTime.substring(0, 10) : 'N/A',
+                startTime: session.startTime ? session.startTime.substring(11, 19) : 'N/A',
+                endTime: session.endTime ? session.endTime.substring(11, 19) : 'N/A',
+                duration: session.duration || 0,
+                energy: session.energyKwh || 0
+            }));
+
+            console.log(`📤 Sending ${formattedSessions.length} formatted sessions`);
+            console.log('Sample:', formattedSessions[0]);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(formattedSessions));
+        } catch (error) {
+            console.error('⚠️ Error fetching download data:', error.message);
+            console.error('Stack:', error.stack);
+            // Return empty array instead of error to allow graceful handling
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify([]));
+        }
     }
     // History API endpoint
     else if (req.url.startsWith('/api/history')) {
@@ -408,23 +464,83 @@ wss.on('connection', (ws, req) => {
             }
 
             if (command.action === "STOP" && charger && charger.socket) {
-                console.log(`🛑 Sending Remote Stop to Charger ${chargerId}...`);
+                console.log(`🛑 STOP REQUEST: Smart-Stop Fallback Sequence`);
+                console.log(`   📊 Charger state: isCharging=${charger.isCharging}, transactionId=${charger.transactionId || 'NONE'}`);
 
-                // Send immediate feedback to dashboard
+                const transactionId = charger.transactionId;
+
+                // PRIORITY 1: Standard Stop (RemoteStopTransaction)
+                // Goal: Cleanly end the session using the live transactionId
+                if (charger.isCharging && transactionId) {
+                    console.log(`   🎯 PRIORITY 1: RemoteStopTransaction (Clean Stop)`);
+                    console.log(`      Using live transactionId: ${transactionId}`);
+                    const remoteStop = [2, "stop-priority1-" + Date.now(), "RemoteStopTransaction", {
+                        transactionId: transactionId
+                    }];
+                    charger.socket.send(JSON.stringify(remoteStop));
+                } else {
+                    console.log(`   ⏭️ PRIORITY 1 skipped (no active transaction)`);
+                }
+
+                // PRIORITY 2: Logic Bypass (ChangeAvailability)
+                // Goal: Force relay to open without needing correct transactionId
+                setTimeout(() => {
+                    if (charger.isCharging) {
+                        console.log(`   ⚡ PRIORITY 2: ChangeAvailability Toggle (Force Relay Open)`);
+                        console.log(`      Setting connector to Inoperative...`);
+
+                        // Step 1: Set to Inoperative (opens relay)
+                        const setInoperative = [2, "stop-priority2a-" + Date.now(), "ChangeAvailability", {
+                            connectorId: 1,
+                            type: "Inoperative"
+                        }];
+                        charger.socket.send(JSON.stringify(setInoperative));
+
+                        // Step 2: Restore to Operative after 2 seconds
+                        setTimeout(() => {
+                            console.log(`      Restoring connector to Operative...`);
+                            const setOperative = [2, "stop-priority2b-" + Date.now(), "ChangeAvailability", {
+                                connectorId: 1,
+                                type: "Operative"
+                            }];
+                            charger.socket.send(JSON.stringify(setOperative));
+                        }, 2000);
+                    }
+                }, 3000);
+
+                // PRIORITY 3: Hardware Reset (Soft Reset)
+                // Goal: Last resort to kill the power
+                setTimeout(() => {
+                    if (charger.isCharging) {
+                        console.log(`   🔄 PRIORITY 3: Soft Reset (Last Resort)`);
+                        console.log(`      ⚠️ Rebooting charger to force stop...`);
+                        const reset = [2, "stop-priority3-" + Date.now(), "Reset", {
+                            type: "Soft"
+                        }];
+                        charger.socket.send(JSON.stringify(reset));
+                    } else {
+                        console.log(`   ⏭️ Priority 3 skipped (charger not charging)`);
+                    }
+                }, 7000);
+
+                // Summary after all priorities
+                setTimeout(() => {
+                    if (charger.isCharging) {
+                        console.log(`   ❌ STOP FAILED: All 3 priorities attempted, charger still charging`);
+                    } else if (!transactionId) {
+                        console.log(`   ⚠️ STOP SKIPPED: No active transaction (car not plugged in)`);
+                    } else {
+                        console.log(`   ✅ STOP SUCCESSFUL: Charging stopped`);
+                    }
+                }, 8000);
+
+                // Notify dashboard
                 broadcastToDashboards({
                     type: 'status',
                     chargerId: chargerId,
                     status: 'Stopping',
-                    message: 'Stop command sent'
+                    message: 'Smart-Stop sequence initiated...'
                 });
-
-                // Use real transaction ID if available, otherwise use fallback for testing
-                const transactionId = charger.transactionId || 1;
-                if (!charger.transactionId) {
-                    console.log("⚠️ No active transaction tracked, using fallback ID for testing");
-                }
-                const remoteStop = [2, "cmd-" + Date.now(), "RemoteStopTransaction", { transactionId }];
-                charger.socket.send(JSON.stringify(remoteStop));
             }
 
             // SET_TIMER: Dashboard sets a timer for a charger
@@ -530,13 +646,41 @@ wss.on('connection', (ws, req) => {
 
     // Configure charger to send MeterValues
     setTimeout(() => {
-        // Set MeterValueSampleInterval to 10 seconds
-        const configInterval = [2, "config-" + Date.now(), "ChangeConfiguration", {
-            key: "MeterValueSampleInterval",
-            value: "10"
+        // DIAGNOSTIC: Check charger configuration for OCPP feature support
+        console.log(`🔍 Checking charger configuration for OCPP feature support...`);
+
+        // Query critical configuration keys
+        const configCheck = [2, "diag-" + Date.now(), "GetConfiguration", {
+            key: [
+                "AuthorizeRemoteTxRequests",
+                "ChargeProfileMaxStackLevel",
+                "ChargingScheduleAllowedChargingRateUnit",
+                "MaxChargingProfilesInstalled",
+                "SupportedFeatureProfiles"
+            ]
         }];
-        ws.send(JSON.stringify(configInterval));
-        console.log("⚙️ Configuring MeterValueSampleInterval to 10 seconds");
+        ws.send(JSON.stringify(configCheck));
+        console.log(`📤 Sent configuration query to diagnose feature support`);
+
+        // FIX: Enable Remote Commands
+        setTimeout(() => {
+            const configRemote = [2, "config-" + Date.now(), "ChangeConfiguration", {
+                key: "AuthorizeRemoteTxRequests",
+                value: "true"
+            }];
+            ws.send(JSON.stringify(configRemote));
+            console.log("⚙️ FIX: Enabling AuthorizeRemoteTxRequests to allow remote stop");
+        }, 500);
+
+        // Set MeterValueSampleInterval to 10 seconds
+        setTimeout(() => {
+            const configInterval = [2, "config-" + Date.now(), "ChangeConfiguration", {
+                key: "MeterValueSampleInterval",
+                value: "10"
+            }];
+            ws.send(JSON.stringify(configInterval));
+            console.log("⚙️ Configuring MeterValueSampleInterval to 10 seconds");
+        }, 1000);
 
         // Set MeterValuesSampledData to include all measurands
         setTimeout(() => {
@@ -546,7 +690,7 @@ wss.on('connection', (ws, req) => {
             }];
             ws.send(JSON.stringify(configMeasurands));
             console.log("⚙️ Configuring MeterValuesSampledData measurands");
-        }, 1000);
+        }, 2000);
 
         // Disable ClockAlignedDataInterval to reduce stop delay
         setTimeout(() => {
@@ -556,7 +700,7 @@ wss.on('connection', (ws, req) => {
             }];
             ws.send(JSON.stringify(configClockAligned));
             console.log("⚙️ Disabling ClockAlignedDataInterval to reduce stop delay");
-        }, 2000);
+        }, 3000);
     }, 2000);
 
     ws.on('message', async (message) => {
@@ -682,7 +826,20 @@ wss.on('connection', (ws, req) => {
 
         // 3. StartTransaction - Track session start
         if (action === 'StartTransaction') {
-            const transactionId = payload.transactionId || Date.now();
+            console.log(`📩 [${chargerId}] StartTransaction Request received`);
+            console.log(`   📋 Payload:`, JSON.stringify(payload, null, 2));
+
+            // Check if charger sent a transactionId
+            let transactionId;
+            if (payload.transactionId) {
+                // Use charger's transaction ID
+                transactionId = payload.transactionId;
+                console.log(`   � Using charger's Transaction ID: ${transactionId}`);
+            } else {
+                // Generate our own transaction ID
+                transactionId = Date.now();
+                console.log(`   🔑 Generated Transaction ID: ${transactionId}`);
+            }
 
             // Update charger metadata
             const charger = chargers.get(chargerId);
@@ -693,12 +850,13 @@ wss.on('connection', (ws, req) => {
                 charger.startTime = new Date();
                 charger.sessionEnergy = 0;
                 charger.lastMeterTime = new Date(); // Initialize to current time for immediate energy tracking
+                console.log(`   ✅ Charger state updated: transactionId=${transactionId}, isCharging=true`);
             }
 
             activeSessions[transactionId] = {
                 chargerId,
                 transactionId,
-                startTime: new Date().toISOString(),
+                startTime: toIST(new Date()),
                 startMeterValue: payload.meterStart || 0
             };
             console.log(`⚡ Session Started on ${chargerId}: Transaction ${transactionId}`);
@@ -753,7 +911,7 @@ wss.on('connection', (ws, req) => {
                         chargerId: session.chargerId,
                         transactionId,
                         startTime: session.startTime,
-                        endTime: endTime.toISOString(),
+                        endTime: toIST(endTime),
                         energyKwh: parseFloat(energyKwh.toFixed(2)),
                         duration
                     });
@@ -846,15 +1004,31 @@ wss.on('connection', (ws, req) => {
         // 4. Handle Command Responses (RemoteStart/RemoteStop)
         if (msgType === 3 && uniqueId.startsWith('cmd-')) {
             console.log(`✅ Charger response to ${uniqueId}:`, payload ? JSON.stringify(payload) : "EMPTY RESPONSE");
+
+            const charger = chargers.get(chargerId);
+
             if (payload && payload.status === 'Rejected') {
                 console.log('⚠️ Command was REJECTED by charger:', payload);
+
+                // If it's a RemoteStop that was rejected, the fallback will trigger
+                if (uniqueId.includes('cmd-') && charger) {
+                    console.log('   ℹ️ Fallback stop method will attempt in 2 seconds...');
+                }
+
                 // Notify all dashboards if command was rejected
                 broadcastToDashboards({
                     type: 'error',
-                    message: `Charger ${chargerId} rejected the command`
+                    chargerId: chargerId,
+                    message: `Charger ${chargerId} rejected the command. Trying alternative method...`
                 });
             } else if (payload && payload.status === 'Accepted') {
                 console.log('✅ Command ACCEPTED by charger');
+
+                // Clear fallback flag if RemoteStop was accepted
+                if (charger && charger.pendingStopFallback) {
+                    charger.pendingStopFallback = false;
+                    console.log('   ✅ Cancelled fallback (command accepted)');
+                }
             } else {
                 console.log('✅ Command response received' + (payload ? '' : ' (no payload)'));
             }
@@ -862,6 +1036,33 @@ wss.on('connection', (ws, req) => {
         // Handle configuration responses
         else if (msgType === 3 && uniqueId.startsWith('config-')) {
             console.log(`⚙️ Configuration response:`, JSON.stringify(payload));
+        }
+        // Handle diagnostic configuration check responses
+        else if (msgType === 3 && uniqueId.startsWith('diag-')) {
+            console.log(`🔍 CHARGER CONFIGURATION DIAGNOSTIC RESULTS:`);
+            if (payload && payload.configurationKey) {
+                payload.configurationKey.forEach(config => {
+                    console.log(`   📋 ${config.key}: ${config.value} ${config.readonly ? '(readonly)' : ''}`);
+                });
+
+                // Analyze critical settings
+                const authRemote = payload.configurationKey.find(k => k.key === 'AuthorizeRemoteTxRequests');
+                const profileStack = payload.configurationKey.find(k => k.key === 'ChargeProfileMaxStackLevel');
+                const maxProfiles = payload.configurationKey.find(k => k.key === 'MaxChargingProfilesInstalled');
+
+                console.log(`\n   🔍 ANALYSIS:`);
+                if (authRemote && authRemote.value === 'false') {
+                    console.log(`   ⚠️ AuthorizeRemoteTxRequests is FALSE - Remote commands may be blocked!`);
+                }
+                if (profileStack && parseInt(profileStack.value) === 0) {
+                    console.log(`   ⚠️ ChargeProfileMaxStackLevel is 0 - SetChargingProfile NOT supported!`);
+                }
+                if (maxProfiles && parseInt(maxProfiles.value) === 0) {
+                    console.log(`   ⚠️ MaxChargingProfilesInstalled is 0 - SetChargingProfile NOT supported!`);
+                }
+            } else if (payload && payload.unknownKey) {
+                console.log(`   ⚠️ Charger doesn't recognize these configuration keys:`, payload.unknownKey);
+            }
         }
         // Handle other responses
         else if (msgType === 3) {
