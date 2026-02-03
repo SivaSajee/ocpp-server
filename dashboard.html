@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LECO Charger App</title>
+    <title>AV Charger App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -668,6 +668,425 @@
             font-weight: 600;
         }
 
+        /* --- DAILY BREAKDOWN LIST --- */
+        .daily-breakdown-section {
+            padding: 0 20px 40px 20px;
+        }
+
+        .daily-breakdown-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .daily-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(102, 126, 234, 0.05);
+        }
+
+        .daily-day-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .daily-day-circle {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .daily-day-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .daily-date {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .daily-weekday {
+            font-size: 11px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .daily-usage-info {
+            text-align: right;
+        }
+
+        .daily-energy {
+            font-weight: 700;
+            color: #1f2937;
+            font-size: 15px;
+        }
+
+        .daily-bar-mini {
+            height: 4px;
+            background: #f3f4f6;
+            width: 80px;
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .daily-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 1s ease;
+        }
+
+        /* --- DLB DASHBOARD STYLES --- */
+        #dlbView {
+            padding: 20px;
+            padding-bottom: 100px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .dlb-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .dlb-card {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .dlb-val {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 8px 0;
+            color: #1f2937;
+        }
+
+        .dlb-label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* DLB Power Flow Hub Visualization */
+        .hub-viz-container {
+            width: 100%;
+            height: 480px;
+            background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+            border-radius: 32px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hub-viz-inner {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 400 / 480;
+            flex-shrink: 0;
+        }
+
+        .hub-node {
+            position: absolute;
+            width: 27.5%;
+            height: 22.9%;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.08);
+            border: 1.5px solid #e2e8f0;
+            z-index: 10;
+            transition: all 0.3s ease;
+            padding: 2.5%;
+        }
+
+        .hub-node:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(102, 126, 234, 0.12);
+        }
+
+        .hub-node-center {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 25%;
+            height: 20.8%;
+            border: 2px solid #5d5fef;
+            color: #5d5fef;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(93, 95, 239, 0.1);
+        }
+
+        .hub-node-tl {
+            top: 7.29%;
+            left: 8.75%;
+            border-color: #bbccff;
+        }
+
+        .hub-node-tr {
+            top: 7.29%;
+            right: 8.75%;
+            border-color: #ffd699;
+        }
+
+        .hub-node-bl {
+            bottom: 7.29%;
+            left: 8.75%;
+            border-color: #99f0bb;
+        }
+
+        .hub-node-br {
+            bottom: 7.29%;
+            right: 8.75%;
+            border-color: #99e2f0;
+        }
+
+        .hub-icon-box {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 6px;
+        }
+
+        .hub-val {
+            font-size: 18px;
+            font-weight: 700;
+            color: #445566;
+            line-height: 1.1;
+        }
+
+        .hub-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #8899aa;
+            text-transform: none;
+            margin-top: 2px;
+        }
+
+        /* SVG Flow Paths */
+        .hub-svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .power-path {
+            fill: none;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            opacity: 0.35;
+        }
+
+        .path-grid {
+            stroke: #6366f1;
+        }
+
+        .path-pv {
+            stroke: #f59e0b;
+        }
+
+        .path-charger {
+            stroke: #10b981;
+        }
+
+        .path-home {
+            stroke: #06b6d4;
+        }
+
+        /* Flow Dots */
+        .flow-dot {
+            r: 4.5;
+            opacity: 0;
+        }
+
+        .flow-dot.active {
+            opacity: 1;
+        }
+
+        .dot-grid {
+            fill: #6366f1;
+            filter: drop-shadow(0 0 5px #6366f1);
+        }
+
+        .dot-pv {
+            fill: #f59e0b;
+            filter: drop-shadow(0 0 5px #f59e0b);
+        }
+
+        .dot-charger {
+            fill: #10b981;
+            filter: drop-shadow(0 0 5px #10b981);
+        }
+
+        .dot-home {
+            fill: #06b6d4;
+            filter: drop-shadow(0 0 5px #06b6d4);
+        }
+
+        .dot-home {
+            fill: #06b6d4;
+            filter: drop-shadow(0 0 4px #06b6d4);
+        }
+
+        @keyframes moveUp {
+            from {
+                offset-distance: 100%;
+            }
+
+            to {
+                offset-distance: 0%;
+            }
+        }
+
+        @keyframes moveDown {
+            from {
+                offset-distance: 0%;
+            }
+
+            to {
+                offset-distance: 100%;
+            }
+        }
+
+        .animate-to-hub {
+            animation: moveUp 2s linear infinite;
+        }
+
+        .animate-from-hub {
+            animation: moveDown 2s linear infinite;
+        }
+
+        /* Controls Area */
+        .dlb-controls {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .control-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .control-item:last-child {
+            border-bottom: none;
+        }
+
+        .control-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .control-text h4 {
+            margin: 0;
+            font-size: 15px;
+            color: #1f2937;
+        }
+
+        .control-text p {
+            margin: 2px 0 0 0;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e5e7eb;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        input:checked+.slider {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(22px);
+        }
+
         /* --- BOTTOM NAV --- */
         .bottom-nav {
             position: fixed;
@@ -713,13 +1132,274 @@
             transition: all 0.3s ease;
         }
 
+
         .nav-item.active svg {
             transform: scale(1.1);
         }
+
+        /* --- TIMER MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .timer-modal {
+            background: white;
+            border-radius: 24px;
+            padding: 30px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-close {
+            font-size: 28px;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: color 0.3s;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #667eea;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 12px;
+            padding: 6px;
+            margin-bottom: 24px;
+        }
+
+        .mode-option {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-option.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .timer-section {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .timer-section.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .timer-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            transition: all 0.3s ease;
+        }
+
+        .timer-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .timer-status {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .timer-status-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .modal-btn-cancel {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e5e7eb;
+        }
+
+        .modal-btn-set {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .modal-btn-set:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        /* --- CONNECTION STATUS BANNER --- */
+        .connection-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 15px;
+            z-index: 2000;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .connection-banner.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .connection-banner-icon {
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 1.5s ease infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .refresh-btn {
+            background: white;
+            color: #ef4444;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            margin-left: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+        }
     </style>
+
 </head>
 
 <body>
+
+    <!-- Connection Status Banner -->
+    <div class="connection-banner" id="connection-banner">
+        <span class="connection-banner-icon">⚠️</span>
+        <span>Connection lost! Please refresh the page to reconnect.</span>
+        <button class="refresh-btn" onclick="location.reload()">Refresh Now</button>
+    </div>
 
     <div class="app-container">
 
@@ -736,27 +1416,10 @@
                 <div class="header-title">Device List</div>
                 <div style="font-size: 28px; cursor: pointer;">+</div>
             </div>
-            <div class="device-card" id="card-1">
-                <div class="device-icon-box" onclick="goToScreen('detail')">
-                    <svg class="icon icon-blue" viewBox="0 0 24 24">
-                        <path d="M13 2L3 14h9v8l10-12h-9z" />
-                    </svg>
-                </div>
-                <div class="device-info" onclick="goToScreen('detail')">
-                    <h3 id="list-name">Charger 01</h3>
-                    <p>ID: <span id="list-id">Waiting...</span></p>
-                    <div class="status-badge">
-                        <span id="list-status">Offline</span>
-                        <svg class="icon" style="width:16px;" viewBox="0 0 24 24">
-                            <path
-                                d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="menu-dots" onclick="toggleMenu('menu-1')">•••</div>
-                <div id="menu-1" class="dropdown-menu">
-                    <div class="dropdown-item" onclick="renameDevice()">Rename</div>
-                    <div class="dropdown-item text-red" onclick="deleteDevice()">Delete</div>
+            <div id="charger-list-container">
+                <!-- Chargers will be injected here dynamically -->
+                <div class="empty-text" style="text-align:center; padding: 40px; color: #9ca3af;">
+                    Searching for chargers...
                 </div>
             </div>
         </div>
@@ -773,16 +1436,17 @@
                     <div style="font-size: 14px; color: #6b7280; margin-bottom: 5px; z-index: 2; font-weight: 600;"
                         id="gauge-status-text">Unplugged</div>
                     <div class="gauge-value"><span id="power-big">0.00</span><span class="gauge-unit">kW</span></div>
-                    <div style="font-size: 14px; color: #6b7280; margin-top: 5px; z-index: 2; font-weight: 500;">0h0m
+                    <div style="font-size: 14px; color: #6b7280; margin-top: 5px; z-index: 2; font-weight: 500;"
+                        id="charging-time">0h 0m
                     </div>
                 </div>
-                <div class="timer-btn">⏱ Charging Timer ></div>
+                <div class="timer-btn" onclick="openTimerModal()">⏱ Charging Timer ></div>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon stat-bg-teal"><svg class="icon" viewBox="0 0 24 24">
                             <path
-                                d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4zM11 20v-5.5H9L13 7v5.5h2L11 20z" />
+                                d="M16 18H8V6h8m0-2H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-7 10h6v2H9v-2zm0-4h6v2H9v-2zm0-4h6v2H9V8z" />
                         </svg></div>
                     <div class="stat-info"><span class="stat-val" id="energy-val">0</span><span
                             class="stat-label">Energy (kWh)</span></div>
@@ -790,15 +1454,15 @@
                 <div class="stat-card">
                     <div class="stat-icon stat-bg-blue"><svg class="icon" viewBox="0 0 24 24">
                             <path
-                                d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z" />
+                                d="M9 2v4H7v2h10V6h-2V2H9zm6 6H9v14h6V8zm-4 12h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2v-2h-2v2z" />
                         </svg></div>
                     <div class="stat-info"><span class="stat-val" id="power-val">0</span><span class="stat-label">Power
                             (W)</span></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon stat-bg-green"><svg class="icon" viewBox="0 0 24 24">
-                            <path
-                                d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                            <path d="M3.5 18.5l9-15 9 15H3.5zm8-2.5h2v-2h-2v2zm0-4h2V8h-2v4z" />
+                            <path d="M2 20h20v2H2v-2z" />
                         </svg></div>
                     <div class="stat-info"><span class="stat-val" id="current-val">0</span><span
                             class="stat-label">Current (A)</span></div>
@@ -806,7 +1470,7 @@
                 <div class="stat-card">
                     <div class="stat-icon stat-bg-blue"><svg class="icon" viewBox="0 0 24 24">
                             <path
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z" />
                         </svg></div>
                     <div class="stat-info"><span class="stat-val" id="voltage-val">0</span><span
                             class="stat-label">Voltage (V)</span></div>
@@ -817,36 +1481,283 @@
             </div>
         </div>
 
-        <div id="historyView">
-            <div class="detail-header">
-                <button class="back-btn" onclick="goToScreen('list')">←</button>
-                <div style="font-weight: 700; font-size: 18px;" id="history-title">Charger 01</div>
-                <div class="icon" style="width: 24px;"></div>
+        <!-- Timer Modal -->
+        <div class="modal-overlay" id="timer-modal-overlay">
+            <div class="timer-modal">
+                <div class="modal-header">
+                    <div class="modal-title">Charging Timer</div>
+                    <div class="modal-close" onclick="closeTimerModal()">×</div>
+                </div>
+
+                <div class="mode-toggle">
+                    <div class="mode-option active" id="mode-duration" onclick="switchTimerMode('duration')">Duration
+                    </div>
+                    <div class="mode-option" id="mode-schedule" onclick="switchTimerMode('schedule')">Schedule</div>
+                </div>
+
+                <!-- Duration Mode -->
+                <div class="timer-section active" id="duration-section">
+                    <div class="input-group">
+                        <label class="input-label">Charge for (minutes)</label>
+                        <input type="number" class="timer-input" id="duration-input" placeholder="30" min="1">
+                    </div>
+                </div>
+
+                <!-- Schedule Mode -->
+                <div class="timer-section" id="schedule-section">
+                    <div class="input-group">
+                        <label class="input-label">Start Time (24-hour)</label>
+                        <input type="time" class="timer-input" id="start-time-input">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">End Time (24-hour)</label>
+                        <input type="time" class="timer-input" id="end-time-input">
+                    </div>
+                </div>
+
+                <!-- Timer Status -->
+                <div class="timer-status" id="timer-status" style="display: none;">
+                    <div class="timer-status-text" id="timer-status-text">No active timer</div>
+                </div>
+
+                <!-- Actions -->
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" onclick="cancelTimer()">Cancel Timer</button>
+                    <button class="modal-btn modal-btn-set" onclick="setTimer()">Set Timer</button>
+                </div>
             </div>
-            <div class="history-toggle">
-                <div class="toggle-opt active" onclick="switchView('month')">Month</div>
-                <div class="toggle-opt" onclick="switchView('year')">Year</div>
+        </div>
+
+        <div id="historyView" style="display: none;">
+            <div id="history-selector">
+                <div class="detail-header">
+                    <button class="back-btn" onclick="goToScreen('list')">←</button>
+                    <div style="font-weight: 700; font-size: 18px;">Select Charger History</div>
+                    <div style="width: 24px;"></div>
+                </div>
+                <div class="device-list" id="history-charger-list" style="margin-top: 20px;">
+                    <!-- Charger list for history selection -->
+                </div>
             </div>
-            <div class="date-nav" id="date-nav-container">
-                <div class="date-arrow" onclick="changePeriod(-1)">&lt;</div>
-                <label class="date-label-wrapper" onclick="openPicker()">
-                    <span class="date-display" id="displayPeriod">2026-01</span>
-                    <input type="month" id="periodPicker" class="date-input-hidden"
-                        onchange="updateHistoryData(this.value)">
-                </label>
-                <div class="date-arrow" onclick="changePeriod(1)">&gt;</div>
+
+            <div id="history-stats" style="display: none;">
+                <div class="detail-header">
+                    <button class="back-btn" onclick="backToHistorySelection()">←</button>
+                    <div style="font-weight: 700; font-size: 18px;" id="history-title">History</div>
+                    <div style="width: 24px;"></div>
+                </div>
+                <div class="history-toggle">
+                    <div class="toggle-opt active" onclick="switchView('month')">Month</div>
+                    <div class="toggle-opt" onclick="switchView('year')">Year</div>
+                </div>
+                <div class="date-nav" id="date-nav-container">
+                    <div class="date-arrow" onclick="changePeriod(-1)">&lt;</div>
+                    <label class="date-label-wrapper" onclick="openPicker()">
+                        <span class="date-display" id="displayPeriod">2026-01</span>
+                        <input type="month" id="periodPicker" class="date-input-hidden"
+                            onchange="updateHistoryData(this.value)">
+                    </label>
+                    <div class="date-arrow" onclick="changePeriod(1)">&gt;</div>
+                </div>
+                <div class="history-summary-card">
+                    <div class="history-total" id="totalUsage">0.00 kW·h</div>
+                    <div class="history-label" id="usage-label">Total Monthly Usage</div>
+                </div>
+                <div class="chart-container" id="chart-container">
+                    <!-- Chart bars will be dynamically generated -->
+                </div>
+                <div class="daily-breakdown-section">
+                    <div class="daily-breakdown-title">
+                        <svg style="width: 20px; height: 20px; margin-right: 8px; color: #667eea;" viewBox="0 0 24 24">
+                            <path fill="currentColor"
+                                d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z" />
+                        </svg>
+                        Daily Breakdown
+                    </div>
+                    <div id="daily-usage-list">
+                        <!-- Daily list items will be injected here -->
+                    </div>
+                </div>
             </div>
-            <div class="history-summary-card">
-                <div class="history-total" id="totalUsage">0.00 kW·h</div>
-                <div class="history-label" id="usage-label">Total Monthly Usage</div>
+        </div>
+
+        <div id="dlbView" style="display: none;">
+            <div class="header-bar">
+                <div class="header-title">Dynamic Load Balance</div>
             </div>
-            <div class="chart-container" id="chart-container">
-                <!-- Chart bars will be dynamically generated -->
+
+            <div id="dlb-offline-overlay"
+                style="display: none; padding: 60px 20px; text-align: center; animation: fadeIn 0.5s ease;">
+                <div
+                    style="width: 80px; height: 80px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;">
+                    <svg viewBox="0 0 24 24" style="width: 40px; color: #ef4444;">
+                        <path fill="currentColor"
+                            d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.59-13L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41z" />
+                    </svg>
+                </div>
+                <h3 style="margin-bottom: 8px; color: #1f2937;">Charger Offline</h3>
+                <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px;">No active connection between server and
+                    charger. Dynamic Load Balance is currently unavailable.</p>
+                <button class="modal-btn modal-btn-set" style="max-width: 200px;" onclick="goToScreen('list')">Go to
+                    Device List</button>
+            </div>
+
+            <div id="dlb-content">
+                <!-- Hub and Spoke Visualization -->
+                <div class="hub-viz-container">
+                    <div class="hub-viz-inner">
+                        <!-- SVG Paths Layer -->
+                        <svg class="hub-svg-layer" viewBox="0 0 400 480">
+                            <!-- S-Curved paths from spoke nodes to hub -->
+                            <!-- Path Grid -> Hub -->
+                            <path id="path-grid" class="power-path path-grid" d="M 90 145 C 90 195, 185 150, 185 190" />
+                            <!-- Path PV -> Hub -->
+                            <path id="path-pv" class="power-path path-pv" d="M 310 145 C 310 195, 215 150, 215 190" />
+                            <!-- Path Hub -> Charger -->
+                            <path id="path-charger" class="power-path path-charger"
+                                d="M 185 290 C 185 330, 90 285, 90 335" />
+                            <!-- Path Hub -> Home -->
+                            <path id="path-home" class="power-path path-home"
+                                d="M 215 290 C 215 330, 310 285, 310 335" />
+
+                            <!-- Flow Dots -->
+                            <circle id="dot-grid" class="flow-dot dot-grid" r="5">
+                                <animateMotion id="anim-grid" dur="2s" repeatCount="indefinite"
+                                    path="M 90 145 C 90 195, 185 150, 185 190" />
+                            </circle>
+                            <circle id="dot-pv" class="flow-dot dot-pv" r="5">
+                                <animateMotion id="anim-pv" dur="2s" repeatCount="indefinite"
+                                    path="M 310 145 C 310 195, 215 150, 215 190" />
+                            </circle>
+                            <circle id="dot-charger" class="flow-dot dot-charger" r="5">
+                                <animateMotion id="anim-charger" dur="2s" repeatCount="indefinite"
+                                    path="M 185 290 C 185 330, 90 285, 90 335" />
+                            </circle>
+                            <circle id="dot-home" class="flow-dot dot-home" r="5">
+                                <animateMotion id="anim-home" dur="2s" repeatCount="indefinite"
+                                    path="M 215 290 C 215 330, 310 285, 310 335" />
+                            </circle>
+                        </svg>
+
+                        <!-- Center Node: Smart logic hub -->
+                        <div class="hub-node hub-node-center">
+                            <div class="hub-icon-box" style="color: #6366f1;">
+                                <svg viewBox="0 0 24 24" style="width: 44px; height: 44px;">
+                                    <path fill="currentColor"
+                                        d="M15,9H9V15H15V9M13,13H11V11H13V13M15,1H9V5H15V1M19,5H5V19H19V5M21,11V9H23V11H21M21,15V13H23V15H21M21,7V5H23V7H21M21,19V17H23V19H21M3,11V9H1V11H3M3,15V13H1V15H3M3,7V5H1V7H3M3,19V17H1V19H3M15,23V19H9V23H15Z" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Top Left: Grid (Pylon) -->
+                        <div class="hub-node hub-node-tl">
+                            <div class="hub-icon-box" style="color: #6366f1;">
+                                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;">
+                                    <path fill="currentColor"
+                                        d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" />
+                                </svg>
+                            </div>
+                            <div class="hub-val" id="dlb-grid-power">0.00kW</div>
+                            <div class="hub-label">Grid load</div>
+                        </div>
+
+                        <!-- Top Right: Solar PV (Solar Panel) -->
+                        <div class="hub-node hub-node-tr">
+                            <div class="hub-icon-box" style="color: #f59e0b;">
+                                <svg viewBox="0 0 24 24" style="width: 36px; height: 36px;">
+                                    <path fill="currentColor"
+                                        d="M4,4V17H20V4H4M6,6H10V10H6V6M14,6H18V10H14V6M6,11H10V15H6V11M14,11H18V15H14V11M12,19V22H13V19H12M15,19V22H16V19H15M9,19V22H10V19H9" />
+                                </svg>
+                            </div>
+                            <div class="hub-val" id="dlb-pv-power">0.00kW</div>
+                            <div class="hub-label">Solar PV</div>
+                        </div>
+
+                        <!-- Bottom Left: Charger (EV Pump) -->
+                        <div class="hub-node hub-node-bl">
+                            <div class="hub-icon-box" style="color: #10b981;">
+                                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;">
+                                    <path fill="currentColor"
+                                        d="M21,7V3H19V7H15V11H19V21H21V11H23V7H21M17,11V9H3V11H4V18H3V20H17V18H16V11H17M14,18H6V11H14V18Z" />
+                                </svg>
+                            </div>
+                            <div class="hub-val" id="dlb-charger-power">0.00kW</div>
+                            <div class="hub-label">Charger</div>
+                        </div>
+
+                        <!-- Bottom Right: Home Load (Home Heart) -->
+                        <div class="hub-node hub-node-br">
+                            <div class="hub-icon-box" style="color: #06b6d4;">
+                                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;">
+                                    <path fill="currentColor" d="M12,3L2,12H5V20H19V12H22L12,3Z" />
+                                </svg>
+                            </div>
+                            <div class="hub-val" id="dlb-home-power">0.00kW</div>
+                            <div class="hub-label">Home load</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modes -->
+                <div class="dlb-controls">
+                    <div class="control-item">
+                        <div class="control-info">
+                            <div class="control-text">
+                                <h4>PV Dynamic Balance</h4>
+                                <p>Prioritize solar power consumption</p>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="dlb-pv-balance"
+                                onchange="updateDLBMode('pvDynamicBalance', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-info">
+                            <div class="control-text">
+                                <h4>Extreme Mode</h4>
+                                <p>Maximum power charging</p>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="dlb-extreme-mode"
+                                onchange="updateDLBMode('extremeMode', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-info">
+                            <div class="control-text">
+                                <h4>Night Full Speed</h4>
+                                <p>Full speed charging at night</p>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="dlb-night-mode"
+                                onchange="updateDLBMode('nightFullSpeed', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-info">
+                            <div class="control-text">
+                                <h4>Anti Overload</h4>
+                                <p>Prevent exceeding grid capacity</p>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="dlb-anti-overload"
+                                onchange="updateDLBMode('antiOverload', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="bottom-nav">
-            <div class="nav-item active" id="nav-home" onclick="goToScreen('detail')">
+            <div class="nav-item active" id="nav-home" onclick="goToScreen('list')">
                 <svg viewBox="0 0 24 24">
                     <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
                 </svg><span>Home</span>
@@ -857,12 +1768,12 @@
                         d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
                 </svg><span>History</span>
             </div>
-            <div class="nav-item">
+            <div class="nav-item" id="nav-dlb" onclick="goToScreen('dlb')">
                 <svg viewBox="0 0 24 24">
                     <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
                 </svg><span>DLB</span>
             </div>
-            <div class="nav-item">
+            <div class="nav-item" id="nav-setting" onclick="goToScreen('setting')">
                 <svg viewBox="0 0 24 24">
                     <path
                         d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
@@ -870,20 +1781,39 @@
             </div>
         </div>
 
+        <div id="settingView" style="display: none; padding: 20px;">
+            <div class="header-bar">
+                <div class="header-title">Settings</div>
+            </div>
+            <div style="text-align: center; padding: 40px; color: #6b7280; font-weight: 500;">
+                Settings screen is coming soon!
+            </div>
+        </div>
+
     </div>
 
     <script>
         // --- APP LOGIC ---
+        let historyChargerId = null; // Currently selected charger for history view
 
         function goToScreen(screenName) {
+            // Hide ALL screens
             document.getElementById('emptyState').style.display = 'none';
             document.getElementById('listView').style.display = 'none';
             document.getElementById('detailView').style.display = 'none';
             document.getElementById('historyView').style.display = 'none';
+            document.getElementById('dlbView').style.display = 'none';
+            if (document.getElementById('settingView')) {
+                document.getElementById('settingView').style.display = 'none';
+            }
 
-            // Reset Nav
+            // Reset Nav active states
             document.getElementById('nav-home').classList.remove('active');
             document.getElementById('nav-history').classList.remove('active');
+            document.getElementById('nav-dlb').classList.remove('active');
+            if (document.getElementById('nav-setting')) {
+                document.getElementById('nav-setting').classList.remove('active');
+            }
 
             if (screenName === 'empty') {
                 document.getElementById('emptyState').style.display = 'flex';
@@ -899,14 +1829,115 @@
             else if (screenName === 'history') {
                 document.getElementById('historyView').style.display = 'block';
                 document.getElementById('nav-history').classList.add('active');
+
                 const picker = document.getElementById('periodPicker');
                 if (picker && !picker.value) {
                     const now = new Date();
                     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                     picker.value = currentMonth;
                     currentPeriod = currentMonth;
-                    updateHistoryData(currentMonth);
                 }
+
+                // Auto-selection: If a charger is selected, go straight to its history
+                if (selectedChargerId) {
+                    showHistoryStats(selectedChargerId);
+                } else if (!historyChargerId) {
+                    showHistorySelection();
+                } else {
+                    showHistoryStats(historyChargerId);
+                }
+
+            }
+            else if (screenName === 'dlb') {
+                document.getElementById('dlbView').style.display = 'block';
+                document.getElementById('nav-dlb').classList.add('active');
+                fetchDLBStatus();
+            }
+            else if (screenName === 'setting') {
+                if (document.getElementById('settingView')) {
+                    document.getElementById('settingView').style.display = 'block';
+                }
+                if (document.getElementById('nav-setting')) {
+                    document.getElementById('nav-setting').classList.add('active');
+                }
+            }
+        }
+
+        function showHistorySelection() {
+            historyChargerId = null;
+            document.getElementById('history-selector').style.display = 'block';
+            document.getElementById('history-stats').style.display = 'none';
+            renderHistoryChargerList();
+        }
+
+        function showHistoryStats(chargerId) {
+            historyChargerId = chargerId;
+            document.getElementById('history-selector').style.display = 'none';
+            document.getElementById('history-stats').style.display = 'block';
+
+            // Update title
+            const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+            document.getElementById('history-title').innerText = (savedNames[chargerId] || chargerId) + " History";
+
+            // Ensure currentPeriod is set before calling updateHistoryData
+            if (!currentPeriod) {
+                const now = new Date();
+                currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+            updateHistoryData(currentPeriod);
+        }
+
+        function backToHistorySelection() {
+            showHistorySelection();
+        }
+
+        function selectChargerHistory(chargerId) {
+            showHistoryStats(chargerId);
+        }
+
+        async function renderHistoryChargerList() {
+            const container = document.getElementById('history-charger-list');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af;">Loading chargers...</div>';
+
+            try {
+                const response = await fetch('/api/chargers/all');
+                const chargerIds = await response.json();
+
+                container.innerHTML = '';
+                if (chargerIds.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af;">No chargers found in history</div>';
+                    return;
+                }
+
+                chargerIds.forEach(id => {
+                    const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+                    const displayName = savedNames[id] || id;
+
+                    const deletedChargers = JSON.parse(localStorage.getItem('deletedChargers') || '[]');
+                    if (deletedChargers.includes(id)) return;
+
+                    const card = document.createElement('div');
+                    card.className = 'device-card';
+                    card.style.cursor = 'pointer';
+                    card.onclick = () => selectChargerHistory(id);
+
+                    card.innerHTML = `
+                        <div class="device-icon-box" style="background: #e5e7eb;">
+                            <svg viewBox="0 0 24 24" style="width: 24px; color: #4b5563;">
+                                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+                            </svg>
+                        </div>
+                        <div class="device-info">
+                            <h3>${displayName}</h3>
+                            <p style="color: #6b7280; font-size: 13px;">${id}</p>
+                        </div>
+                        <div style="color: #10b981; font-weight: 600;">View ></div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error fetching chargers for history:', error);
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Failed to load chargers</div>';
             }
         }
 
@@ -941,62 +1972,529 @@
         const wsUrl = protocol + '//' + window.location.host + '/dashboard-ui';
         const ws = new WebSocket(wsUrl);
 
+        // Multi-charger support
+        let selectedChargerId = null;  // Currently selected charger
+        let chargersData = {};          // All charger data: { chargerId: { status, isCharging, timer, sessionData, ... } }
+
+        // Legacy variables (will be moved to per-charger)
         let isCharging = false;
+        let chargingStartTime = null;
+        let chargingTimer = null;
+        let sessionEnergy = 0; // Total energy in kWh for current session
+        let lastEnergyReading = 0; // Last energy meter reading
 
         ws.onopen = () => {
             console.log('✅ Dashboard connected to server');
+            // Hide connection banner if it was showing
+            document.getElementById('connection-banner').classList.remove('show');
         };
 
         ws.onerror = (error) => {
             console.error('❌ WebSocket error:', error);
+            // Show connection banner
+            document.getElementById('connection-banner').classList.add('show');
         };
 
         ws.onclose = () => {
             console.log('🔌 Dashboard disconnected from server');
+            // Show connection banner
+            document.getElementById('connection-banner').classList.add('show');
         };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log('📩 received:', data);
 
-            // 1. CONNECTION DETECTED!
+            // A. CHARGER LIST UPDATE
+            if (data.type === 'chargerList') {
+                updateChargerDataFromList(data.chargers);
+                return;
+            }
+
+            // 3. DLB UPDATE
+            if (data.type === 'dlb') {
+                updateDLBUI(data.chargerId, data.data, data.modes);
+                return;
+            }
+
+
+            // 4. DLB CONFIG UPDATE
+            if (data.type === 'dlbConfig') {
+                updateDLBModeToggles(data.modes);
+                return;
+            }
+
+            // All other messages should have a chargerId
+            const chargerId = data.chargerId;
+            if (!chargerId) return;
+
+            // Ensure charger exists in our local store
+            if (!chargersData[chargerId]) {
+                chargersData[chargerId] = {
+                    id: chargerId,
+                    status: 'Unknown',
+                    isCharging: false,
+                    voltage: 0,
+                    current: 0,
+                    power: 0,
+                    sessionEnergy: 0,
+                    startTime: null
+                };
+            }
+
+            const charger = chargersData[chargerId];
+
+            // 1. STATUS UPDATE
             if (data.type === 'status') {
-                const statusEl = document.getElementById('list-status');
-                statusEl.innerText = data.status;
-                document.getElementById('list-id').innerText = data.id;
+                charger.status = data.status;
 
-                if (data.status === 'Online') {
-                    statusEl.style.color = '#10b981';
+                // If this is the selected charger, update UI
+                if (chargerId === selectedChargerId) {
+                    updateStatusUI(data.status);
 
-                    // Auto-Switch to Detail View when device connects!
-                    if (document.getElementById('emptyState').style.display !== 'none') {
-                        goToScreen('detail');
+                    // Update button and timer visibility for offline status
+                    const isOffline = data.status === 'Offline';
+                    const btn = document.getElementById('main-btn');
+                    const timerBtn = document.querySelector('.timer-btn');
+                    if (isOffline) {
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            btn.style.cursor = 'not-allowed';
+                            btn.innerText = 'Charger Offline';
+                        }
+                        if (timerBtn) timerBtn.style.display = 'none';
+                    } else {
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                            // Note: text will be updated by charging block or sync
+                        }
+                        if (timerBtn) timerBtn.style.display = 'block';
                     }
+                }
+                checkDLBVisibility();
+                renderChargerListUI();
+            }
 
-                    if (!isCharging) document.getElementById('wave-fill').style.transform = "translateY(80%)";
+            // 1b. CHARGING STATUS UPDATE
+            if (data.type === 'charging') {
+                const isNowCharging = (data.status === 'Charging');
+                charger.isCharging = isNowCharging;
+                charger.status = data.status || (isNowCharging ? 'Charging' : 'Online');
+
+                if (isNowCharging) {
+                    if (data.sessionData && data.sessionData.startTime) {
+                        charger.startTime = new Date(data.sessionData.startTime);
+                    }
                 } else {
-                    statusEl.style.color = '#6b7280';
+                    // Reset charger metrics on stop
+                    charger.startTime = null;
+                    charger.sessionEnergy = 0;
+                    charger.power = 0;
+                    charger.current = 0;
+                }
+
+                if (chargerId === selectedChargerId) {
+                    isCharging = charger.isCharging;
+                    chargingStartTime = charger.startTime;
+
+                    const btn = document.getElementById('main-btn');
+                    const wave = document.getElementById('wave-fill');
+
+                    if (isNowCharging) {
+                        btn.innerText = "Stop Charging";
+                        btn.classList.add('active');
+                        wave.style.transform = "translateY(20%)";
+                        wave.style.opacity = "0.8";
+                        updateStatusUI('Charging');
+                        if (!chargingTimer) startChargingTimer();
+                    } else {
+                        btn.innerText = "Start Charging";
+                        btn.classList.remove('active');
+                        wave.style.transform = "translateY(80%)";
+                        wave.style.opacity = "0.3";
+                        updateStatusUI(data.status || 'Online');
+                        stopChargingTimer();
+                        // Reset UI values
+                        document.getElementById('energy-val').innerText = '0.000';
+                        document.getElementById('charging-time').innerText = '0h 0m';
+                        document.getElementById('power-val').innerText = '0';
+                        document.getElementById('current-val').innerText = '0.00';
+                        document.getElementById('power-big').innerText = '0.00';
+                        document.getElementById('voltage-val').innerText = '0';
+                    }
+                }
+                renderChargerListUI();
+            }
+
+            // 2. METER VALUES update
+            if (data.type === 'meter') {
+                charger.voltage = data.voltage || 0;
+                charger.current = data.current || 0;
+                charger.power = data.power || 0;
+                // Sync session energy from server if available
+                if (data.sessionEnergy !== undefined) {
+                    charger.sessionEnergy = data.sessionEnergy;
+                }
+
+                if (chargerId === selectedChargerId) {
+                    if (document.getElementById('voltage-val')) document.getElementById('voltage-val').innerText = charger.voltage || 0;
+                    if (document.getElementById('current-val')) document.getElementById('current-val').innerText = (charger.current || 0).toFixed(2);
+                    if (document.getElementById('power-val')) document.getElementById('power-val').innerText = (charger.power || 0).toFixed(0);
+
+                    const powerKw = (charger.power / 1000).toFixed(2);
+                    if (document.getElementById('power-big')) document.getElementById('power-big').innerText = powerKw;
+
+                    if (document.getElementById('energy-val')) {
+                        document.getElementById('energy-val').innerText = (charger.sessionEnergy || 0).toFixed(3);
+                    }
+                }
+                renderChargerListUI();
+            }
+        };
+
+        // UI Update Helpers
+        function updateStatusUI(status) {
+            const statusEl = document.getElementById('list-status'); // This might move to detail status
+            const gaugeStatusText = document.getElementById('gauge-status-text');
+
+            let label = status;
+            let color = '#6b7280';
+
+            if (status === 'Online' || status === 'Charging') {
+                color = '#10b981';
+                if (status === 'Online') label = 'Online';
+                if (status === 'Charging') label = 'Charging';
+            } else if (status === 'Preparing') {
+                label = 'Waiting for Connection';
+                color = '#3b82f6';
+            } else if (status === 'Stopping') {
+                label = 'Stopping...';
+                color = '#f59e0b';
+            } else if (status === 'Offline') {
+                label = 'Offline';
+                color = '#ef4444';
+            }
+
+            if (gaugeStatusText) {
+                gaugeStatusText.innerText = label;
+                gaugeStatusText.style.color = color;
+            }
+        }
+
+        function updateChargerDataFromList(chargers) {
+            chargers.forEach(c => {
+                if (!chargersData[c.id]) {
+                    chargersData[c.id] = {
+                        ...c,
+                        voltage: c.voltage || 0,
+                        current: c.current || 0,
+                        power: c.power || 0,
+                        sessionEnergy: c.sessionEnergy || 0,
+                        startTime: c.startTime ? new Date(c.startTime) : null
+                    };
+                } else {
+                    // Update metrics from server list
+                    chargersData[c.id].voltage = c.voltage !== undefined ? c.voltage : chargersData[c.id].voltage;
+                    chargersData[c.id].current = c.current !== undefined ? c.current : chargersData[c.id].current;
+                    chargersData[c.id].power = c.power !== undefined ? c.power : chargersData[c.id].power;
+                    chargersData[c.id].sessionEnergy = c.sessionEnergy !== undefined ? c.sessionEnergy : chargersData[c.id].sessionEnergy;
+                    chargersData[c.id].startTime = c.startTime ? new Date(c.startTime) : chargersData[c.id].startTime;
+
+                    // Merge other properties
+                    Object.assign(chargersData[c.id], {
+                        status: c.status,
+                        isCharging: c.isCharging,
+                        activeTimer: c.activeTimer,
+                        timerSetAt: c.timerSetAt
+                    });
+                }
+
+                // If server says it's charging, ensure local state reflects it
+                if (c.status === 'Charging') {
+                    chargersData[c.id].isCharging = true;
+                }
+
+                if (c.id === selectedChargerId) {
+                    updateStatusUI(c.status);
+                }
+
+                // Restore persistent timer if it exists and we haven't already
+                if (c.activeTimer && (!chargersData[c.id].activeTimerCalculated)) {
+                    chargersData[c.id].scheduledEndTime = new Date(c.activeTimer.endTime);
+                    chargersData[c.id].activeTimerCalculated = true;
+                    if (c.id === selectedChargerId) {
+                        activeChargingTimer = c.activeTimer;
+                        scheduledEndTime = chargersData[c.id].scheduledEndTime;
+                        updateTimerStatus();
+                        startTimerCheck();
+                    }
+                } else if (!c.activeTimer) {
+                    chargersData[c.id].scheduledEndTime = null;
+                    chargersData[c.id].activeTimerCalculated = false;
+                    if (c.id === selectedChargerId) {
+                        activeChargingTimer = null;
+                        scheduledEndTime = null;
+                    }
+                }
+            });
+
+            // NEW: Auto-select first charger if nothing is selected
+            if (!selectedChargerId && Object.keys(chargersData).length > 0) {
+                const firstId = Object.keys(chargersData)[0];
+                console.log(`🎯 Auto-selecting charger: ${firstId}`);
+                selectedChargerId = firstId;
+                historyChargerId = firstId;
+
+                // If we already have DLB data for this charger, update the UI now
+                const charger = chargersData[selectedChargerId];
+                if (charger && charger.dlbData) {
+                    updateDLBUI(selectedChargerId, charger.dlbData);
+                }
+
+                // NEW: Also pull freshest data from API
+                fetchDLBStatus();
+            }
+
+
+
+            checkDLBVisibility();
+            renderChargerListUI();
+
+            // Auto-switch to list view if we were in empty state and now have chargers
+            if (Object.keys(chargersData).length > 0 && document.getElementById('emptyState').style.display !== 'none') {
+                goToScreen('list');
+            }
+        }
+
+
+        function renderChargerListUI() {
+            const container = document.getElementById('charger-list-container');
+            if (!container) return;
+
+            const chargers = Object.values(chargersData);
+            if (chargers.length === 0) {
+                container.innerHTML = `<div class="empty-text" style="text-align:center; padding: 40px; color: #9ca3af;">Searching for chargers...</div>`;
+                return;
+            }
+
+            // Remove empty text if present
+            const emptyText = container.querySelector('.empty-text');
+            if (emptyText) emptyText.remove();
+
+            chargers.forEach(charger => {
+                // Support local deletion (hiding)
+                const deletedChargers = JSON.parse(localStorage.getItem('deletedChargers') || '[]');
+                if (deletedChargers.includes(charger.id)) {
+                    const existing = document.getElementById(`card-${charger.id}`);
+                    if (existing) existing.remove();
+                    return;
+                }
+
+                const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+                const displayName = savedNames[charger.id] || charger.id;
+
+                const isOnline = charger.status === 'Online' || charger.status === 'Charging' || charger.status === 'Preparing';
+                const statusColor = charger.status === 'Charging' ? '#10b981' : (charger.status === 'Preparing' ? '#3b82f6' : (isOnline ? '#10b981' : '#ef4444'));
+                const statusLabel = charger.status === 'Online' ? 'Online' : (charger.status === 'Preparing' ? 'Waiting' : charger.status);
+
+                let card = document.getElementById(`card-${charger.id}`);
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${charger.id}`;
+                    card.className = 'device-card';
+                    card.innerHTML = `
+                        <div class="device-icon-box" onclick="selectCharger('${charger.id}')">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M13 2L3 14h9v8l10-12h-9z" />
+                            </svg>
+                        </div>
+                        <div class="device-info" onclick="selectCharger('${charger.id}')">
+                            <h3 class="card-name"></h3>
+                            <p>ID: <span>${charger.id}</span></p>
+                            <div class="status-badge">
+                                <span class="card-status"></span>
+                            </div>
+                        </div>
+                        <div class="menu-dots" onclick="event.stopPropagation(); toggleCardMenu('${charger.id}')">•••</div>
+                        <div id="menu-${charger.id}" class="dropdown-menu">
+                            <div class="dropdown-item" onclick="event.stopPropagation(); renameCharger('${charger.id}')">Rename</div>
+                            <div class="dropdown-item text-red" onclick="event.stopPropagation(); deleteCharger('${charger.id}')">Delete</div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                }
+
+                // Update styles and content efficiently
+                card.style.borderColor = (selectedChargerId === charger.id) ? '#10b981' : 'rgba(255, 255, 255, 0.5)';
+
+                const icon = card.querySelector('.icon');
+                icon.setAttribute('class', `icon ${charger.isCharging ? 'icon-green' : 'icon-blue'}`);
+
+                card.querySelector('.card-name').innerText = displayName;
+
+                const statusSpan = card.querySelector('.card-status');
+                statusSpan.innerText = statusLabel;
+                statusSpan.style.color = statusColor;
+            });
+
+            // Cleanup cards for chargers that no longer exist
+            const currentIds = chargers.map(c => `card-${c.id}`);
+            const allCards = container.querySelectorAll('.device-card');
+            allCards.forEach(c => {
+                if (!currentIds.includes(c.id)) c.remove();
+            });
+        }
+
+
+        function toggleCardMenu(chargerId) {
+            const menu = document.getElementById(`menu-${chargerId}`);
+            const allMenus = document.querySelectorAll('.dropdown-menu');
+            allMenus.forEach(m => { if (m !== menu) m.style.display = 'none'; });
+
+            if (menu.style.display === 'block') {
+                menu.style.display = 'none';
+            } else {
+                menu.style.display = 'block';
+            }
+        }
+
+        // Close menus when clicking anywhere else
+        window.addEventListener('click', () => {
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display = 'none');
+        });
+
+        function renameCharger(chargerId) {
+            const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+            const currentName = savedNames[chargerId] || chargerId;
+            const newName = prompt("Rename Charger:", currentName);
+            if (newName && newName.trim()) {
+                savedNames[chargerId] = newName.trim();
+                localStorage.setItem('chargerNames', JSON.stringify(savedNames));
+                renderChargerListUI();
+                if (selectedChargerId === chargerId) {
+                    document.getElementById('detail-title').innerText = newName.trim();
+                }
+            }
+        }
+
+        function deleteCharger(chargerId) {
+            if (confirm(`Are you sure you want to hide charger ${chargerId}?`)) {
+                const deletedChargers = JSON.parse(localStorage.getItem('deletedChargers') || '[]');
+                if (!deletedChargers.includes(chargerId)) {
+                    deletedChargers.push(chargerId);
+                    localStorage.setItem('deletedChargers', JSON.stringify(deletedChargers));
+                }
+                renderChargerListUI();
+                if (selectedChargerId === chargerId) goToScreen('list');
+            }
+        }
+
+        function selectCharger(chargerId) {
+            selectedChargerId = chargerId;
+            const charger = chargersData[chargerId];
+            if (!charger) return;
+
+            // Update Detail Header with Custom Name
+            const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+            document.getElementById('detail-title').innerText = savedNames[chargerId] || chargerId;
+
+            // Update Metrics instantly
+            if (document.getElementById('voltage-val')) document.getElementById('voltage-val').innerText = charger.voltage || 0;
+            if (document.getElementById('current-val')) document.getElementById('current-val').innerText = (charger.current || 0).toFixed(2);
+            if (document.getElementById('power-val')) document.getElementById('power-val').innerText = (charger.power || 0).toFixed(0);
+            const powerKw = (charger.power / 1000).toFixed(2);
+            if (document.getElementById('power-big')) document.getElementById('power-big').innerText = powerKw;
+            if (document.getElementById('energy-val')) document.getElementById('energy-val').innerText = (charger.sessionEnergy || 0).toFixed(3);
+
+            // Update UI components
+            updateStatusUI(charger.status);
+
+            // Restore local charging state variables
+            isCharging = charger.isCharging;
+            chargingStartTime = charger.startTime;
+
+            // Sync Button and gauge
+            const btn = document.getElementById('main-btn');
+            const wave = document.getElementById('wave-fill');
+            const timerBtn = document.querySelector('.timer-btn');
+            const isOffline = charger.status === 'Offline';
+
+            if (isOffline) {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.innerText = 'Charger Offline';
+                wave.style.filter = 'grayscale(1)';
+                if (timerBtn) timerBtn.style.display = 'none';
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                wave.style.filter = 'none';
+                if (timerBtn) timerBtn.style.display = 'block';
+
+                if (isCharging) {
+                    btn.innerText = "Stop Charging";
+                    btn.classList.add('active');
+                    wave.style.transform = "translateY(20%)";
+                    wave.style.opacity = "0.8";
+                    if (!chargingTimer) startChargingTimer();
+                } else {
+                    btn.innerText = "Start Charging";
+                    btn.classList.remove('active');
+                    wave.style.transform = "translateY(80%)";
+                    wave.style.opacity = "0.3";
+
+                    // Show final time if we have a start time
+                    updateTimeDisplay(charger.startTime);
+                    stopChargingTimer();
                 }
             }
 
-            // 2. METER DATA
-            if (data.type === 'meter') {
-                document.getElementById('voltage-val').innerText = data.voltage;
-                document.getElementById('current-val').innerText = data.current;
-                document.getElementById('power-val').innerText = data.power;
-                document.getElementById('power-big').innerText = (data.power / 1000).toFixed(2);
+            activeChargingTimer = charger.activeTimer;
+            scheduledEndTime = charger.scheduledEndTime;
+            updateTimerStatus();
+            if (activeChargingTimer && !timerCheckInterval) startTimerCheck();
+
+            // Setup History context
+            historyChargerId = chargerId;
+
+            // Refresh DLB UI if we have data
+            if (charger.dlbData) {
+                updateDLBUI(chargerId, charger.dlbData);
             }
-        };
+
+            // Always fetch latest DLB status from API to be sure
+            fetchDLBStatus();
+
+
+            // Screen Navigation
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
+        }
+
 
         // --- HISTORY VIEW FUNCTIONS ---
         let currentViewType = 'month'; // 'month' or 'year'
         let currentPeriod = '2026-01'; // YYYY-MM or YYYY
 
-        function switchView(viewType) {
+        function switchView(viewType, event) {
             currentViewType = viewType;
 
             // Update toggle buttons
             document.querySelectorAll('.toggle-opt').forEach(opt => opt.classList.remove('active'));
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Fallback for code calls - find by text
+                document.querySelectorAll('.toggle-opt').forEach(opt => {
+                    if (opt.innerText.toLowerCase().includes(viewType)) opt.classList.add('active');
+                });
+            }
 
             // Update label and picker type
             const label = document.getElementById('usage-label');
@@ -1046,20 +2544,101 @@
             document.getElementById('displayPeriod').innerText = period;
 
             try {
-                // Fetch real data from API
-                const response = await fetch(`/api/history?period=${period}&type=${currentViewType}`);
+                // Fetch real data from API with chargerId filter
+                let url = `/api/history?period=${period}&type=${currentViewType}`;
+                if (historyChargerId) {
+                    url += `&chargerId=${historyChargerId}`;
+                }
+                const response = await fetch(url);
                 const data = await response.json();
 
                 // Update total
                 document.getElementById('totalUsage').innerText = data.totalEnergy + " kW·h";
 
+                // Sort chart data by label (day or month) if it's not sorted
+                const sortedChartData = [...data.chartData].sort((a, b) => a.label - b.label);
+
                 // Render chart
-                renderChart(data.chartData, currentViewType);
+                renderChart(sortedChartData, currentViewType);
+
+                // Render daily list
+                renderDailyList(sortedChartData, currentViewType, period);
             } catch (error) {
                 console.error('Error fetching history:', error);
                 document.getElementById('totalUsage').innerText = "0.00 kW·h";
                 renderChart([], currentViewType);
+                const listContainer = document.getElementById('daily-usage-list');
+                if (listContainer) listContainer.innerHTML = '';
             }
+        }
+
+        function renderDailyList(chartData, viewType, period) {
+            const container = document.getElementById('daily-usage-list');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // Only show detailed list for monthly view
+            if (viewType !== 'month') {
+                container.parentElement.style.display = 'none';
+                return;
+            }
+
+            container.parentElement.style.display = 'block';
+
+            if (chartData.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 14px;">No daily records</div>';
+                return;
+            }
+
+            const maxEnergy = Math.max(...chartData.map(d => parseFloat(d.energy)), 0.1);
+
+            // Get days in month for the given period (YYYY-MM)
+            const [year, month] = period.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            // Show all days or just those with data? Usually better to show only those with data or reversed list
+            // Let's show all days that have energy > 0, sorted by day (descending)
+            const activeDays = chartData.filter(d => parseFloat(d.energy) > 0).sort((a, b) => b.label - a.label);
+
+            if (activeDays.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 14px;">No energy usage recorded this month</div>';
+                return;
+            }
+
+            activeDays.forEach(dayData => {
+                const day = dayData.label;
+                const energy = parseFloat(dayData.energy);
+                const date = new Date(year, month - 1, day);
+                const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                const percentage = (energy / maxEnergy) * 100;
+
+                const item = document.createElement('div');
+                item.className = 'daily-item';
+                item.innerHTML = `
+                    <div class="daily-day-info">
+                        <div class="daily-day-circle">${day}</div>
+                        <div class="daily-day-text">
+                            <span class="daily-date">${dateStr}</span>
+                            <span class="daily-weekday">${weekday}</span>
+                        </div>
+                    </div>
+                    <div class="daily-usage-info">
+                        <div class="daily-energy">${energy.toFixed(2)} kWh</div>
+                        <div class="daily-bar-mini">
+                            <div class="daily-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+
+                // Trigger animation
+                setTimeout(() => {
+                    item.querySelector('.daily-bar-fill').style.width = percentage + '%';
+                }, 100);
+            });
         }
 
         function renderChart(chartData, viewType) {
@@ -1071,56 +2650,571 @@
                 return;
             }
 
-            // Find max value for scaling
-            const maxEnergy = Math.max(...chartData.map(d => parseFloat(d.energy)), 1);
+            if (viewType === 'month') {
+                // Improved Single Row Column Graph for Month
+                container.style.flexDirection = 'row';
+                container.style.gap = '8px';
+                container.style.height = '200px';
+                container.style.padding = '20px 0 30px 0';
+                container.style.overflowX = 'auto';
+                container.style.justifyContent = 'flex-start';
+                container.style.alignItems = 'flex-end';
+                container.style.borderBottom = 'none';
 
-            // Determine number of bars to show
-            const numBars = viewType === 'month' ? 31 : 12;
+                // Get days in month
+                const [year, month] = currentPeriod.split('-').map(Number);
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const maxEnergy = Math.max(...chartData.map(d => parseFloat(d.energy)), 0.1);
 
-            // Create bars
-            for (let i = 1; i <= numBars; i++) {
-                const dataPoint = chartData.find(d => d.label === i);
-                const energy = dataPoint ? parseFloat(dataPoint.energy) : 0;
-                const height = energy > 0 ? Math.max((energy / maxEnergy) * 100, 5) : 0;
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dataPoint = chartData.find(d => d.label === i);
+                    const energy = dataPoint ? parseFloat(dataPoint.energy) : 0;
+                    const height = energy > 0 ? Math.max((energy / maxEnergy) * 100, 5) : 0;
 
-                const barGroup = document.createElement('div');
-                barGroup.className = 'bar-group';
+                    const barGroup = document.createElement('div');
+                    barGroup.className = 'bar-group';
+                    barGroup.style.width = '32px';
+                    barGroup.style.minWidth = '32px';
+                    barGroup.style.height = '100%';
+                    barGroup.style.display = 'flex';
+                    barGroup.style.flexDirection = 'column';
+                    barGroup.style.justifyContent = 'flex-end';
+                    barGroup.style.alignItems = 'center';
+                    barGroup.style.flex = '0 0 auto';
 
-                const bar = document.createElement('div');
-                bar.className = energy > 0 ? 'bar highlight' : 'bar';
-                bar.style.height = height + '%';
+                    const bar = document.createElement('div');
+                    bar.className = energy > 0 ? 'bar highlight' : 'bar';
+                    bar.style.height = '0%'; // Start at 0 for animation
+                    bar.style.width = '14px';
+                    bar.style.borderRadius = '6px 6px 0 0';
+                    bar.style.flexShrink = '0';
+                    bar.title = `Day ${i}: ${energy} kWh`;
 
-                const label = document.createElement('span');
-                label.className = 'bar-label';
-                label.innerText = i;
+                    const label = document.createElement('span');
+                    label.className = 'bar-label';
+                    label.innerText = i;
+                    label.style.fontSize = '10px';
+                    label.style.marginTop = '8px';
+                    label.style.fontWeight = '600';
+                    label.style.color = '#9ca3af';
 
-                barGroup.appendChild(bar);
-                barGroup.appendChild(label);
-                container.appendChild(barGroup);
+                    barGroup.appendChild(bar);
+                    barGroup.appendChild(label);
+                    container.appendChild(barGroup);
+
+                    // Animate bars
+                    setTimeout(() => {
+                        bar.style.height = height + '%';
+                    }, 50 * (i % 10)); // Staggered animation
+                }
+            } else {
+                // Year View (Monthly distribution)
+                container.style.flexDirection = 'row';
+                container.style.gap = '5px';
+                container.style.height = '180px';
+                container.style.overflowX = 'hidden';
+                container.style.justifyContent = 'space-around';
+                container.style.padding = '0 10px';
+                container.style.borderBottom = '2px solid rgba(102, 126, 234, 0.2)';
+
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const maxEnergyYear = Math.max(...chartData.map(d => parseFloat(d.energy)), 1);
+
+                for (let i = 1; i <= 12; i++) {
+                    const dataPoint = chartData.find(d => d.label === i);
+                    const energy = dataPoint ? parseFloat(dataPoint.energy) : 0;
+                    const height = energy > 0 ? Math.max((energy / maxEnergyYear) * 100, 5) : 0;
+
+                    const barGroup = document.createElement('div');
+                    barGroup.className = 'bar-group';
+                    barGroup.style.width = 'auto';
+                    barGroup.style.height = '100%';
+                    barGroup.style.display = 'flex';
+                    barGroup.style.flexDirection = 'column';
+                    barGroup.style.justifyContent = 'flex-end';
+                    barGroup.style.alignItems = 'center';
+
+                    const bar = document.createElement('div');
+                    bar.className = energy > 0 ? 'bar highlight' : 'bar';
+                    bar.style.height = height + '%';
+                    bar.style.width = '20px';
+                    bar.style.borderRadius = '10px 10px 0 0';
+                    bar.title = `${months[i - 1]}: ${energy} kWh`;
+
+                    const label = document.createElement('span');
+                    label.className = 'bar-label';
+                    label.innerText = months[i - 1];
+                    label.style.marginTop = '8px';
+
+                    barGroup.appendChild(bar);
+                    barGroup.appendChild(label);
+                    container.appendChild(barGroup);
+                }
             }
         }
 
         // --- OTHER FUNCTIONS ---
 
+        // Function to update charging timer display
+        function startChargingTimer() {
+            // Clear any existing timer
+            if (chargingTimer) {
+                clearInterval(chargingTimer);
+            }
+
+            chargingTimer = setInterval(() => {
+                if (chargingStartTime) {
+                    const now = new Date();
+                    const elapsed = Math.floor((now - chargingStartTime) / 1000); // seconds
+                    const hours = Math.floor(elapsed / 3600);
+                    const minutes = Math.floor((elapsed % 3600) / 60);
+
+                    // Update elapsed time display
+                    let timeDisplay = `${hours}h ${minutes}m`;
+
+                    // If there's an active charging timer, also show countdown
+                    if (activeChargingTimer && activeChargingTimer.mode === 'duration' && scheduledEndTime) {
+                        const remaining = Math.max(0, Math.floor((scheduledEndTime - now) / 1000 / 60));
+                        timeDisplay = `${hours}h ${minutes}m (${remaining} min left)`;
+                    }
+
+                    document.getElementById('charging-time').innerText = timeDisplay;
+                }
+            }, 1000); // Update every second
+        }
+
+        function updateTimeDisplay(startTime) {
+            if (startTime) {
+                const now = new Date();
+                const elapsed = Math.floor((now - startTime) / 1000); // seconds
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                document.getElementById('charging-time').innerText = `${hours}h ${minutes}m`;
+            } else {
+                document.getElementById('charging-time').innerText = '0h 0m';
+            }
+        }
+
+        function stopChargingTimer() {
+            if (chargingTimer) {
+                clearInterval(chargingTimer);
+                chargingTimer = null;
+            }
+            // Note: We no longer clear chargingStartTime here
+            // chargingStartTime = null; 
+        }
+
         function toggleCharging() {
+            if (!selectedChargerId) {
+                alert("Please select a charger from the list first!");
+                goToScreen('list');
+                return;
+            }
+
             const btn = document.getElementById('main-btn');
             const statusText = document.getElementById('gauge-status-text');
             const wave = document.getElementById('wave-fill');
+
             if (!isCharging) {
-                ws.send(JSON.stringify({ action: "START" }));
+                console.log(`🚀 Starting charger: ${selectedChargerId}`);
+                ws.send(JSON.stringify({
+                    action: "START",
+                    chargerId: selectedChargerId
+                }));
+
                 isCharging = true;
+                const charger = chargersData[selectedChargerId];
+                if (charger) {
+                    charger.isCharging = true;
+                    charger.startTime = new Date();
+                    charger.sessionEnergy = 0; // Reset energy for new session
+                    charger.lastMeterTime = null;
+                }
+                chargingStartTime = charger ? charger.startTime : new Date();
+
                 btn.innerText = "Stop Charging"; btn.classList.add('active');
-                statusText.innerText = "Requesting Start..."; statusText.style.color = "#f59e0b";
+                statusText.innerText = "Charging"; statusText.style.color = "#10b981";
                 wave.style.transform = "translateY(20%)"; wave.style.opacity = "0.8";
+
+                startChargingTimer(); // Start timer immediately
+
+                if (!activeChargingTimer) {
+                    scheduledEndTime = null;
+                    if (timerCheckInterval) {
+                        clearInterval(timerCheckInterval);
+                        timerCheckInterval = null;
+                    }
+                }
             } else {
-                ws.send(JSON.stringify({ action: "STOP" }));
+                console.log(`🛑 Stopping charger: ${selectedChargerId}`);
+                ws.send(JSON.stringify({
+                    action: "STOP",
+                    chargerId: selectedChargerId
+                }));
+
                 isCharging = false;
+                const charger = chargersData[selectedChargerId];
+                if (charger) {
+                    charger.isCharging = false;
+                    charger.activeTimer = null;
+                    charger.scheduledEndTime = null;
+                    charger.activeTimerCalculated = false;
+                    charger.startTime = null;
+                    charger.sessionEnergy = 0;
+                }
+
                 btn.innerText = "Start Charging"; btn.classList.remove('active');
                 statusText.innerText = "Stopping..."; statusText.style.color = "#6b7280";
                 wave.style.transform = "translateY(100%)";
+
+                // Reset UI values immediately
+                document.getElementById('voltage-val').innerText = '0';
+                document.getElementById('current-val').innerText = '0.00';
+                document.getElementById('power-val').innerText = '0';
+                document.getElementById('power-big').innerText = '0.00';
+                document.getElementById('energy-val').innerText = '0.000';
+                document.getElementById('charging-time').innerText = '0h 0m';
+
+                if (chargingTimer) {
+                    clearInterval(chargingTimer);
+                    chargingTimer = null;
+                }
+                chargingStartTime = null;
+
+                if (activeChargingTimer) {
+                    cancelTimer();
+                }
+            }
+        }
+
+        // --- TIMER FUNCTIONS ---
+
+        let currentTimerMode = 'duration';
+        let activeChargingTimer = null;
+        let timerCheckInterval = null;
+        let scheduledEndTime = null;
+
+        function openTimerModal() {
+            document.getElementById('timer-modal-overlay').classList.add('active');
+            updateTimerStatus();
+        }
+
+        function closeTimerModal() {
+            document.getElementById('timer-modal-overlay').classList.remove('active');
+        }
+
+        function switchTimerMode(mode) {
+            currentTimerMode = mode;
+
+            // Update toggle buttons
+            document.getElementById('mode-duration').classList.toggle('active', mode === 'duration');
+            document.getElementById('mode-schedule').classList.toggle('active', mode === 'schedule');
+
+            // Update sections
+            document.getElementById('duration-section').classList.toggle('active', mode === 'duration');
+            document.getElementById('schedule-section').classList.toggle('active', mode === 'schedule');
+        }
+
+        function setTimer() {
+            if (!selectedChargerId) {
+                alert("Please select a charger first");
+                return;
+            }
+
+            if (currentTimerMode === 'duration') {
+                const minutes = parseInt(document.getElementById('duration-input').value);
+                if (!minutes || minutes < 1) {
+                    alert('Please enter a valid duration in minutes');
+                    return;
+                }
+
+                // Calculate end time
+                scheduledEndTime = new Date();
+                scheduledEndTime.setMinutes(scheduledEndTime.getMinutes() + minutes);
+
+                activeChargingTimer = {
+                    mode: 'duration',
+                    duration: minutes,
+                    endTime: scheduledEndTime.toISOString()
+                };
+
+                // Store in local data
+                if (chargersData[selectedChargerId]) {
+                    chargersData[selectedChargerId].activeTimer = activeChargingTimer;
+                    chargersData[selectedChargerId].scheduledEndTime = scheduledEndTime;
+                    chargersData[selectedChargerId].activeTimerCalculated = true;
+                }
+
+                // Send to server for persistence
+                ws.send(JSON.stringify({
+                    action: "SET_TIMER",
+                    chargerId: selectedChargerId,
+                    timer: activeChargingTimer
+                }));
+
+                // Start charging immediately
+                if (!isCharging) {
+                    toggleCharging();
+                }
+
+                startTimerCheck();
+                updateTimerStatus();
+                closeTimerModal();
+
+                console.log(`⏱ Timer set for ${selectedChargerId}: ${minutes} minutes`);
+            } else {
+                const startTime = document.getElementById('start-time-input').value;
+                const endTime = document.getElementById('end-time-input').value;
+
+                if (!startTime || !endTime) {
+                    alert('Please set both start and end times');
+                    return;
+                }
+
+                activeChargingTimer = {
+                    mode: 'schedule',
+                    startTime: startTime,
+                    endTime: endTime
+                };
+
+                // Store in local data
+                if (chargersData[selectedChargerId]) {
+                    chargersData[selectedChargerId].activeTimer = activeChargingTimer;
+                }
+
+                // Send to server for persistence
+                ws.send(JSON.stringify({
+                    action: "SET_TIMER",
+                    chargerId: selectedChargerId,
+                    timer: activeChargingTimer
+                }));
+
+                startTimerCheck();
+                updateTimerStatus();
+                closeTimerModal();
+
+                console.log(`⏱ Schedule set for ${selectedChargerId}: ${startTime} to ${endTime}`);
+            }
+        }
+
+        function cancelTimer() {
+            if (!selectedChargerId) return;
+
+            activeChargingTimer = null;
+            scheduledEndTime = null;
+
+            if (chargersData[selectedChargerId]) {
+                chargersData[selectedChargerId].activeTimer = null;
+                chargersData[selectedChargerId].scheduledEndTime = null;
+                chargersData[selectedChargerId].activeTimerCalculated = false;
+            }
+
+            // Send to server
+            ws.send(JSON.stringify({
+                action: "CANCEL_TIMER",
+                chargerId: selectedChargerId
+            }));
+
+            if (timerCheckInterval) {
+                clearInterval(timerCheckInterval);
+                timerCheckInterval = null;
+            }
+
+            updateTimerStatus();
+            console.log(`⏱ Timer cancelled for ${selectedChargerId}`);
+        }
+
+        function startTimerCheck() {
+            // Clear any existing interval
+            if (timerCheckInterval) {
+                clearInterval(timerCheckInterval);
+            }
+
+            // Check every 10 seconds
+            timerCheckInterval = setInterval(checkChargingTimer, 10000);
+        }
+
+        function checkChargingTimer() {
+            if (!activeChargingTimer) return;
+
+            const now = new Date();
+
+            if (activeChargingTimer.mode === 'duration') {
+                // Check if duration has elapsed
+                if (now >= scheduledEndTime) {
+                    console.log('⏱ Duration timer completed - stopping charging');
+                    if (isCharging) {
+                        toggleCharging();
+                    }
+                    cancelTimer();
+                }
+            } else if (activeChargingTimer.mode === 'schedule') {
+                const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                const startTime = activeChargingTimer.startTime;
+                const endTime = activeChargingTimer.endTime;
+
+                // Check if it's time to start
+                if (!isCharging && currentTime === startTime) {
+                    console.log('⏱ Schedule timer: starting charging');
+                    toggleCharging();
+                }
+
+                // Check if it's time to stop
+                if (isCharging && currentTime === endTime) {
+                    console.log('⏱ Schedule timer: stopping charging');
+                    toggleCharging();
+                    cancelTimer();
+                }
+            }
+
+            updateTimerStatus();
+        }
+
+        function updateTimerStatus() {
+            const statusDiv = document.getElementById('timer-status');
+            const statusText = document.getElementById('timer-status-text');
+
+            if (!activeChargingTimer) {
+                statusDiv.style.display = 'none';
+                return;
+            }
+
+            statusDiv.style.display = 'block';
+
+            if (activeChargingTimer.mode === 'duration') {
+                const now = new Date();
+                const remaining = Math.max(0, Math.floor((scheduledEndTime - now) / 1000 / 60));
+                statusText.innerText = `Active: ${remaining} minutes remaining`;
+            } else {
+                statusText.innerText = `Active: ${activeChargingTimer.startTime} to ${activeChargingTimer.endTime}`;
+            }
+        }
+
+        // --- DLB FUNCTIONS ---
+        async function fetchDLBStatus() {
+            if (!selectedChargerId) return;
+            try {
+                const response = await fetch(`/api/dlb/status?chargerId=${selectedChargerId}`);
+                const data = await response.json();
+                updateDLBUI(selectedChargerId, data, data.config);
+                updateDLBModeToggles(data.config);
+            } catch (error) {
+                console.error('Error fetching DLB status:', error);
+            }
+        }
+
+
+        function checkDLBVisibility() {
+            const overlay = document.getElementById('dlb-offline-overlay');
+            const content = document.getElementById('dlb-content');
+
+            if (!selectedChargerId) {
+                if (content) content.style.display = 'none';
+                if (overlay) {
+                    overlay.style.display = 'block';
+                    overlay.querySelector('h3').innerText = "No Charger Selected";
+                    overlay.querySelector('p').innerText = "Please select a charger from the Device List to view its DLB site data.";
+                }
+                return;
+            }
+
+            const charger = chargersData[selectedChargerId];
+            const isOnline = charger && charger.status !== 'Offline' && charger.status !== 'Unknown';
+
+            if (!isOnline) {
+                if (content) content.style.display = 'none';
+                if (overlay) {
+                    overlay.style.display = 'block';
+                    overlay.querySelector('h3').innerText = "Charger Offline";
+                    overlay.querySelector('p').innerText = "This charger is currently offline. DLB data is unavailable until it reconnects.";
+                }
+            } else {
+                if (content) content.style.display = 'block';
+                if (overlay) overlay.style.display = 'none';
+            }
+        }
+
+
+
+        function updateDLBUI(chargerId, dlbData, modes) {
+            // Save data to local cache
+            if (chargersData[chargerId]) {
+                chargersData[chargerId].dlbData = dlbData;
+            }
+
+            // Only update UI if it's the selected charger
+            if (chargerId !== selectedChargerId) return;
+
+            checkDLBVisibility();
+            // Don't update values if overlay is showing
+            if (document.getElementById('dlb-offline-overlay').style.display === 'block') return;
+
+            // Update power values
+            if (document.getElementById('dlb-grid-power')) {
+                document.getElementById('dlb-grid-power').innerText = (dlbData.gridPower / 1000).toFixed(2) + 'kW';
+            }
+            if (document.getElementById('dlb-pv-power')) {
+                document.getElementById('dlb-pv-power').innerText = (dlbData.pvPower / 1000).toFixed(2) + 'kW';
+            }
+            if (document.getElementById('dlb-home-power')) {
+                document.getElementById('dlb-home-power').innerText = (dlbData.homeLoad / 1000).toFixed(2) + 'kW';
+            }
+            if (document.getElementById('dlb-charger-power')) {
+                document.getElementById('dlb-charger-power').innerText = (dlbData.totalChargerLoad / 1000).toFixed(2) + 'kW';
+            }
+
+            // Sync Flow Dots visibility
+            if (document.getElementById('dot-grid')) {
+                document.getElementById('dot-grid').classList.toggle('active', dlbData.gridPower > 100);
+            }
+            if (document.getElementById('dot-pv')) {
+                document.getElementById('dot-pv').classList.toggle('active', dlbData.pvPower > 100);
+            }
+            if (document.getElementById('dot-charger')) {
+                document.getElementById('dot-charger').classList.toggle('active', dlbData.totalChargerLoad > 100);
+            }
+            if (document.getElementById('dot-home')) {
+                document.getElementById('dot-home').classList.toggle('active', dlbData.homeLoad > 100);
+            }
+        }
+
+
+        function updateDLBModeToggles(modes) {
+            if (modes.pvDynamicBalance !== undefined && document.getElementById('dlb-pv-balance')) {
+                document.getElementById('dlb-pv-balance').checked = modes.pvDynamicBalance;
+            }
+            if (modes.extremeMode !== undefined && document.getElementById('dlb-extreme-mode')) {
+                document.getElementById('dlb-extreme-mode').checked = modes.extremeMode;
+            }
+            if (modes.nightFullSpeed !== undefined && document.getElementById('dlb-night-mode')) {
+                document.getElementById('dlb-night-mode').checked = modes.nightFullSpeed;
+            }
+            if (modes.antiOverload !== undefined && document.getElementById('dlb-anti-overload')) {
+                document.getElementById('dlb-anti-overload').checked = modes.antiOverload;
+            }
+        }
+
+        async function updateDLBMode(modeName, value) {
+            try {
+                const update = {};
+                update[modeName] = value;
+
+                const response = await fetch('/api/dlb/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(update)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log(`DLB Mode ${modeName} updated to ${value}`);
+                }
+            } catch (error) {
+                console.error('Error updating DLB mode:', error);
             }
         }
     </script>
+
 
 </body>
 

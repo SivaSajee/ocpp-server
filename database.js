@@ -9,7 +9,12 @@ async function connectDB() {
     try {
         const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 
-        client = new MongoClient(uri);
+        client = new MongoClient(uri, {
+            serverSelectionTimeoutMS: 15000, // 15s (was 5s) - Atlas shards can be slow to discover
+            connectTimeoutMS: 20000,       // 20s for initial connection
+            socketTimeoutMS: 60000,        // 60s for queries (Atlas free tier can be slow)
+        });
+
         await client.connect();
 
         db = client.db('ocpp'); // Database name
@@ -68,12 +73,15 @@ async function getChargingSessions(filter = {}) {
 }
 
 // Get sessions by period (for history API)
-async function getSessionsByPeriod(period, viewType = 'month') {
+async function getSessionsByPeriod(period, viewType = 'month', chargerId) {
     try {
         const db = getDB();
         const collection = db.collection('charging_sessions');
 
         let filter = {};
+        if (chargerId) {
+            filter.chargerId = chargerId;
+        }
 
         if (viewType === 'month') {
             // Filter by YYYY-MM
