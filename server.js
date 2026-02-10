@@ -26,6 +26,59 @@ const server = http.createServer(async (req, res) => {
             else { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(data); }
         });
     }
+    // Serve static files (CSS/JS)
+    else if (req.url.startsWith('/css/') || req.url.startsWith('/js/')) {
+        const safePath = path.normalize(req.url).replace(/^(\.\.[\/\\])+/, '');
+        const filePath = path.join(__dirname, 'public', safePath);
+
+        const ext = path.extname(filePath);
+        const contentType = ext === '.css' ? 'text/css' : 'application/javascript';
+
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.writeHead(404);
+                res.end('File not found');
+            } else {
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(data);
+            }
+        });
+    }
+    // Get list of chargers with history
+    else if (req.url === '/api/history/chargers') {
+        try {
+            const { getDB } = require('./database');
+            const db = getDB();
+            const collection = db.collection('charging_sessions');
+
+            // Aggregate to get unique chargers with session counts and total energy
+            const chargers = await collection.aggregate([
+                {
+                    $group: {
+                        _id: '$chargerId',
+                        sessionCount: { $sum: 1 },
+                        totalEnergy: { $sum: '$energyKwh' }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        chargerId: '$_id',
+                        sessionCount: 1,
+                        totalEnergy: 1
+                    }
+                },
+                { $sort: { chargerId: 1 } }
+            ]).toArray();
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(chargers));
+        } catch (error) {
+            console.error('⚠️ Error fetching chargers:', error.message);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify([]));
+        }
+    }
     // Download history endpoint - Get all sessions for a specific charger
     // IMPORTANT: This must come BEFORE /api/history to avoid incorrect matching
     else if (req.url.startsWith('/api/history/download')) {
@@ -191,6 +244,60 @@ const server = http.createServer(async (req, res) => {
             }
         });
     }
+    // Power Limit Settings - GET current value
+    else if (req.url === '/api/settings/power-limit' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            maxChargeAmps: dlbConfig.maxChargeAmps,
+            minChargeAmps: dlbConfig.minChargeAmps
+        }));
+    }
+    // Power Limit Settings - POST update value
+    else if (req.url === '/api/settings/power-limit' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const update = JSON.parse(body);
+                const newLimit = parseInt(update.maxChargeAmps);
+
+                // Validate input
+                if (isNaN(newLimit) || newLimit < 6 || newLimit > 32) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'Invalid value. Must be between 6 and 32 Amps.'
+                    }));
+                    return;
+                }
+
+                // Update configuration
+                dlbConfig.maxChargeAmps = newLimit;
+                console.log(`⚙️ Power Limit Updated: ${newLimit}A`);
+
+                // Trigger immediate DLB recalculation for all active chargers
+                allocatePowerToChargers();
+
+                // Broadcast to all dashboards
+                broadcastToDashboards({
+                    type: 'powerLimitUpdate',
+                    maxChargeAmps: newLimit
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    maxChargeAmps: newLimit
+                }));
+            } catch (error) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: 'Invalid JSON'
+                }));
+            }
+        });
+    }
     else {
         res.writeHead(200);
         res.end('Server Online');
@@ -220,10 +327,10 @@ const dlbConfig = {
     nightEndHour: 6,            // Night mode end (06:00)
 
     modes: {
-        pvDynamicBalance: true,     // User: "Prioritize solar power"
+        pvDynamicBalance: false,     // User: "Prioritize solar power"
         extremeMode: false,         // User: "Maximum power charging" (Overrides PV)
         nightFullSpeed: false,      // User: "Full speed at night" (Auto-switch)
-        antiOverload: true          // User: "Prevent exceeding grid capacity" (Safety)
+        antiOverload: false          // User: "Prevent exceeding grid capacity" (Safety)
     }
 };
 
@@ -338,31 +445,22 @@ function allocatePowerToChargers() {
             modeDescription = "Standard";
         }
 
+
         // --- 2. Apply Constraints ---
 
         // CONSTRAINT A: Minimum Amps (Standard EV Protocol)
-        // Check this BEFORE Anti-Overload? Or AFTER? 
-        // User says: "If excess solar is < 6A, pause."
-        // This applies specifically to PV Dynamic.
-        if ((dlbConfig.modes.pvDynamicBalance && !dlbConfig.modes.extremeMode && !isNightBoostActive) && targetAmps < dlbConfig.minChargeAmps) {
-            // Too low to charge safely or efficiently
-            // Action: Suspend/Pause
-            targetAmps = 0;
-            modeDescription += " (Paused - Low Solar)";
-        } else {
-            // For other modes, or if we are above threshold, clamp to min/max
-            // But if it's 0 (paused), we keep it 0.
-            // Wait, if it IS Extreme mode, we definitely want > 6A (which is handled by setting target=32A)
-            // So we just ensure we don't send like 3A to the car.
-            if (targetAmps > 0 && targetAmps < dlbConfig.minChargeAmps) {
-                targetAmps = dlbConfig.minChargeAmps; // Clamp to min if not 0
-            }
+        // Ensure we never go below minimum charging current (6A) when charging
+        // This prevents the charger from pausing and losing meter values
+        if (targetAmps > 0 && targetAmps < dlbConfig.minChargeAmps) {
+            targetAmps = dlbConfig.minChargeAmps; // Clamp to min if not 0
+            modeDescription += " (Min Current)";
         }
 
-        // Clamp to Hardware Max
+        // Clamp to Hardware Max (Power Limit from Settings)
         if (targetAmps > dlbConfig.maxChargeAmps) {
             targetAmps = dlbConfig.maxChargeAmps;
         }
+
 
 
         // --- 3. Anti Overload (Safety Layer) ---
@@ -408,13 +506,13 @@ function allocatePowerToChargers() {
             csChargingProfiles: {
                 chargingProfileId: 1,
                 stackLevel: 0,
-                chargingProfilePurpose: "TxProfile",
-                chargingProfileKind: "Absolute",
+                chargingProfilePurpose: "TxDefaultProfile",  // Changed from TxProfile for better compatibility
+                chargingProfileKind: "Relative",  // Changed from Absolute - more widely supported
                 chargingSchedule: {
                     chargingRateUnit: "W",
                     chargingSchedulePeriod: [{
                         startPeriod: 0,
-                        limit: Math.max(0, powerLimitWatts)
+                        limit: Math.max(1380, powerLimitWatts)  // Minimum 1380W (6A * 230V)
                     }]
                 }
             }
@@ -469,70 +567,78 @@ wss.on('connection', (ws, req) => {
 
                 const transactionId = charger.transactionId;
 
-                // PRIORITY 1: Standard Stop (RemoteStopTransaction)
-                // Goal: Cleanly end the session using the live transactionId
-                if (charger.isCharging && transactionId) {
-                    console.log(`   🎯 PRIORITY 1: RemoteStopTransaction (Clean Stop)`);
-                    console.log(`      Using live transactionId: ${transactionId}`);
-                    const remoteStop = [2, "stop-priority1-" + Date.now(), "RemoteStopTransaction", {
-                        transactionId: transactionId
-                    }];
-                    charger.socket.send(JSON.stringify(remoteStop));
-                } else {
-                    console.log(`   ⏭️ PRIORITY 1 skipped (no active transaction)`);
-                }
-
-                // PRIORITY 2: Logic Bypass (ChangeAvailability)
-                // Goal: Force relay to open without needing correct transactionId
-                setTimeout(() => {
-                    if (charger.isCharging) {
-                        console.log(`   ⚡ PRIORITY 2: ChangeAvailability Toggle (Force Relay Open)`);
-                        console.log(`      Setting connector to Inoperative...`);
-
-                        // Step 1: Set to Inoperative (opens relay)
-                        const setInoperative = [2, "stop-priority2a-" + Date.now(), "ChangeAvailability", {
-                            connectorId: 1,
-                            type: "Inoperative"
-                        }];
-                        charger.socket.send(JSON.stringify(setInoperative));
-
-                        // Step 2: Restore to Operative after 2 seconds
-                        setTimeout(() => {
-                            console.log(`      Restoring connector to Operative...`);
-                            const setOperative = [2, "stop-priority2b-" + Date.now(), "ChangeAvailability", {
-                                connectorId: 1,
-                                type: "Operative"
-                            }];
-                            charger.socket.send(JSON.stringify(setOperative));
-                        }, 2000);
+                // PRIORITY 0: Set current to 0A to gracefully reduce power before stopping
+                console.log(`   ⚡ PRIORITY 0: Setting current to 0A (Graceful Power Reduction)`);
+                const setZeroCurrent = [2, "stop-priority0-" + Date.now(), "SetChargingProfile", {
+                    connectorId: 1,
+                    csChargingProfiles: {
+                        chargingProfileId: 1,
+                        stackLevel: 0,
+                        chargingProfilePurpose: "TxDefaultProfile",
+                        chargingProfileKind: "Relative",
+                        chargingSchedule: {
+                            chargingRateUnit: "W",
+                            chargingSchedulePeriod: [{
+                                startPeriod: 0,
+                                limit: 0  // 0W = stop charging
+                            }]
+                        }
                     }
-                }, 3000);
+                }];
+                charger.socket.send(JSON.stringify(setZeroCurrent));
 
-                // PRIORITY 3: Hardware Reset (Soft Reset)
-                // Goal: Last resort to kill the power
+                // Wait 2 seconds for current to drop to 0
                 setTimeout(() => {
+                    console.log(`   ✅ Current reduced to 0A, proceeding with stop sequence...`);
+                }, 2000);
+
+                // Soft Reset (Only method that works for this charger)
+                // Execute after 2.5 seconds to allow current to drop to 0
+                setTimeout(async () => {
                     if (charger.isCharging) {
-                        console.log(`   🔄 PRIORITY 3: Soft Reset (Last Resort)`);
-                        console.log(`      ⚠️ Rebooting charger to force stop...`);
-                        const reset = [2, "stop-priority3-" + Date.now(), "Reset", {
+                        console.log(`   🔄 STEP 2: Soft Reset (Charger Reboot)`);
+                        console.log(`      ⚠️ Rebooting charger to stop charging...`);
+
+                        // IMPORTANT: Save session BEFORE reset (since reset won't send StopTransaction)
+                        const transactionId = charger.transactionId;
+                        const session = activeSessions[transactionId];
+
+                        if (session) {
+                            const endTime = new Date();
+                            const startTime = new Date(session.startTime);
+                            const duration = Math.floor((endTime - startTime) / 1000 / 60); // minutes
+
+                            // Use last known energy value from charger metadata (already in kWh)
+                            const energyKwh = charger.sessionEnergy || 0;
+
+                            console.log(`      💾 Saving session before reset: ${energyKwh.toFixed(2)} kWh`);
+
+                            try {
+                                await saveChargingSession({
+                                    chargerId: session.chargerId,
+                                    transactionId,
+                                    startTime: session.startTime,
+                                    endTime: toIST(endTime),
+                                    energyKwh: parseFloat(energyKwh.toFixed(2)),
+                                    duration,
+                                    stoppedBy: 'SoftReset' // Mark how it was stopped
+                                });
+                                console.log(`      ✅ Session saved before reset`);
+                                delete activeSessions[transactionId];
+                            } catch (error) {
+                                console.error(`      ❌ Error saving session before reset:`, error.message);
+                            }
+                        }
+
+                        // Now send the reset
+                        const reset = [2, "stop-step2-" + Date.now(), "Reset", {
                             type: "Soft"
                         }];
                         charger.socket.send(JSON.stringify(reset));
                     } else {
-                        console.log(`   ⏭️ Priority 3 skipped (charger not charging)`);
+                        console.log(`   ✅ Charging already stopped`);
                     }
-                }, 7000);
-
-                // Summary after all priorities
-                setTimeout(() => {
-                    if (charger.isCharging) {
-                        console.log(`   ❌ STOP FAILED: All 3 priorities attempted, charger still charging`);
-                    } else if (!transactionId) {
-                        console.log(`   ⚠️ STOP SKIPPED: No active transaction (car not plugged in)`);
-                    } else {
-                        console.log(`   ✅ STOP SUCCESSFUL: Charging stopped`);
-                    }
-                }, 8000);
+                }, 2500); // Execute 2.5 seconds after zero current command
 
                 // Notify dashboard
                 broadcastToDashboards({
@@ -757,6 +863,9 @@ wss.on('connection', (ws, req) => {
             });
 
             console.log(`⚡ MeterValues [${chargerId}]: ${power}W, ${voltage}V, ${current}A`);
+            if (energy !== null) {
+                console.log(`   📊 Energy Register: ${energy} Wh`);
+            }
 
 
             // Update charger-specific DLB state if any DLB measurands are present
@@ -773,9 +882,22 @@ wss.on('connection', (ws, req) => {
 
                     // TRIGGER DLB CALCULATION IMMEDIATELY
                     // This ensures the charger gets the new profile ASAP when conditions change
-                    allocatePowerToChargers();
+                    // allocatePowerToChargers(); // Commented out as per instruction
 
-                    console.log(`   📊 [${chargerId}] DLB Sync: Grid=${(charger.dlbState.gridPower / 1000).toFixed(1)}kW, PV=${(charger.dlbState.pvPower / 1000).toFixed(1)}kW`);
+                    // Periodic DLB Sync (Every 15 seconds)
+                    // DISABLED: Charger doesn't support SetChargingProfile (returns ProtocolError)
+                    // TODO: Find alternative method to limit current (hardware configuration?)
+                    /*
+                    setInterval(() => {
+                        chargers.forEach((charger, id) => {
+                            if (charger.isCharging && charger.dlbState) {
+                                console.log(`📊 [${id}] Periodic DLB Sync: Grid=${(charger.dlbState.gridPower / 1000).toFixed(1)}kW, Available=${(charger.dlbState.availablePower / 1000).toFixed(1)}kW`);
+                            }
+                        });
+                        allocatePowerToChargers();
+                    }, 15000);
+                    */
+
 
                     // Instant broadcast to dashboards
                     broadcastToDashboards({
@@ -798,16 +920,56 @@ wss.on('connection', (ws, req) => {
                 charger.current = current;
                 charger.power = power;
 
-                if (charger.isCharging) {
-                    const now = new Date();
-                    if (charger.lastMeterTime) {
-                        const deltaTime = (now - charger.lastMeterTime) / 1000; // seconds
-                        const energyDelta = (power * deltaTime) / 3600 / 1000; // kWh
-                        charger.sessionEnergy = (charger.sessionEnergy || 0) + energyDelta;
+                // Handle recovery mode - establish baseline from current meter reading
+                if (charger.recoveryMode && energy !== null) {
+                    console.log(`   ✅ Recovery: Got current meter value: ${energy} Wh`);
+                    console.log(`   📊 Setting energy baseline for continued tracking`);
+
+                    // Set the baseline - future readings will be relative to this
+                    charger.recoveryBaseline = energy;
+                    charger.sessionEnergy = 0; // Start from 0, will add delta from baseline
+                    charger.recoveryMode = false; // Exit recovery mode
+
+                    // Update session with baseline
+                    const session = activeSessions[charger.transactionId];
+                    if (session) {
+                        session.startMeterValue = energy;
+                        session.recoveryBaseline = energy;
                     }
-                    charger.lastMeterTime = now;
+                }
+
+                // Calculate session energy
+                if (charger.isCharging) {
+                    if (energy !== null) {
+                        // Use actual meter register if available (most accurate)
+                        const session = activeSessions[charger.transactionId];
+                        if (session && session.startMeterValue !== undefined) {
+                            // Calculate from meter register difference
+                            charger.sessionEnergy = (energy - session.startMeterValue) / 1000; // Convert Wh to kWh
+                        } else if (charger.recoveryBaseline) {
+                            // Post-recovery: use baseline
+                            charger.sessionEnergy = (energy - charger.recoveryBaseline) / 1000; // Convert Wh to kWh
+                        } else {
+                            // Fallback: use raw energy value
+                            charger.sessionEnergy = energy / 1000; // Convert Wh to kWh
+                        }
+                    } else {
+                        // Fallback to time-based calculation if no meter register
+                        const now = new Date();
+                        if (charger.lastMeterTime) {
+                            const deltaTime = (now - charger.lastMeterTime) / 1000; // seconds
+                            const energyDelta = (power * deltaTime) / 3600 / 1000; // kWh
+                            charger.sessionEnergy = (charger.sessionEnergy || 0) + energyDelta;
+                        }
+                        charger.lastMeterTime = now;
+                    }
                 } else {
                     charger.lastMeterTime = null;
+                }
+
+                // Debug: Log session energy if charging
+                if (charger.isCharging && charger.sessionEnergy > 0) {
+                    console.log(`   🔋 Session Energy: ${charger.sessionEnergy.toFixed(3)} kWh`);
                 }
             }
 
@@ -885,8 +1047,14 @@ wss.on('connection', (ws, req) => {
             const transactionId = payload.transactionId;
             const session = activeSessions[transactionId];
 
-            // Update charger metadata
+            // CRITICAL: Capture energy BEFORE clearing charger metadata
             const charger = chargers.get(chargerId);
+            const energyKwh = charger ? (charger.sessionEnergy || 0) : 0;
+
+            console.log(`📊 StopTransaction received: transactionId=${transactionId}`);
+            console.log(`   💾 Captured session energy: ${energyKwh.toFixed(3)} kWh`);
+
+            // Update charger metadata (clear after capturing energy)
             if (charger) {
                 charger.isCharging = false;
                 charger.transactionId = null;
@@ -903,7 +1071,8 @@ wss.on('connection', (ws, req) => {
                 const endTime = new Date();
                 const startTime = new Date(session.startTime);
                 const duration = Math.floor((endTime - startTime) / 1000 / 60); // minutes
-                const energyKwh = ((payload.meterStop || 0) - session.startMeterValue) / 1000; // Wh to kWh
+
+                console.log(`📊 StopTransaction: Energy=${energyKwh.toFixed(2)} kWh, Duration=${duration} min`);
 
                 // Save to MongoDB
                 try {
@@ -913,7 +1082,8 @@ wss.on('connection', (ws, req) => {
                         startTime: session.startTime,
                         endTime: toIST(endTime),
                         energyKwh: parseFloat(energyKwh.toFixed(2)),
-                        duration
+                        duration,
+                        stoppedBy: 'StopTransaction' // Natural stop
                     });
                     console.log(`🔋 Session Saved to MongoDB: ${energyKwh.toFixed(2)} kWh`);
                 } catch (error) {
@@ -932,7 +1102,7 @@ wss.on('connection', (ws, req) => {
             broadcastToDashboards({
                 type: 'charging',
                 chargerId: chargerId,
-                status: 'Available',
+                status: 'Online',  // Map to UI "Online" instead of OCPP "Available"
                 message: 'Charging stopped'
             });
 
@@ -953,10 +1123,49 @@ wss.on('connection', (ws, req) => {
             const connectorStatus = payload.status; // e.g., "Available", "Preparing", "Charging", "Finishing"
             console.log(`📊 [${chargerId}] Status changed to: ${connectorStatus}`);
 
-            // Update charger metadata in Map
             const charger = chargers.get(chargerId);
             if (charger) {
-                charger.status = (connectorStatus === 'Available') ? 'Online' : connectorStatus;
+                charger.status = connectorStatus;
+
+                // If charger reports "Charging" but we don't have an active session, create one
+                // This handles server restart during active charging
+                if (connectorStatus === 'Charging' && !charger.isCharging) {
+                    console.log(`⚡ [${chargerId}] Detected active charging session (server restart recovery)`);
+
+                    // Generate a recovery transaction ID
+                    const recoveryTransactionId = Date.now();
+                    charger.isCharging = true;
+                    charger.transactionId = recoveryTransactionId;
+                    charger.startTime = toIST(new Date()); // Temporary - will be updated when we get meter values
+                    charger.sessionEnergy = 0; // Will update from MeterValues
+                    charger.recoveryMode = true; // Flag to indicate we're recovering
+
+                    // Create session entry
+                    activeSessions[recoveryTransactionId] = {
+                        chargerId,
+                        transactionId: recoveryTransactionId,
+                        startTime: charger.startTime,
+                        startMeterValue: 0, // Unknown, will use relative energy
+                        recovered: true // Mark as recovered session
+                    };
+
+                    console.log(`   📝 Created recovery session: Transaction ${recoveryTransactionId}`);
+                    console.log(`   🔍 Requesting current meter values from charger...`);
+
+                    // Request current meter values using TriggerMessage
+                    // This will give us the actual current energy reading
+                    const triggerMeterValues = [2, "trigger-meter-" + Date.now(), "TriggerMessage", {
+                        requestedMessage: "MeterValues",
+                        connectorId: 1
+                    }];
+
+                    charger.socket.send(JSON.stringify(triggerMeterValues));
+                }
+
+                // If status is Available or Finishing, mark as not charging
+                if (connectorStatus === 'Available' || connectorStatus === 'Finishing') {
+                    charger.isCharging = false;
+                }
             }
 
             // Send appropriate status to dashboard based on charger state
@@ -977,9 +1186,9 @@ wss.on('connection', (ws, req) => {
                     type: 'charging',
                     chargerId: chargerId,
                     status: 'Charging',
-                    message: 'Vehicle connected - charging in progress'
+                    message: 'Vehicle connected'
                 });
-                console.log('📤 Sent "Charging" status to dashboard (vehicle connected)');
+                console.log(`📤 Sent "Charging" status to dashboard (vehicle connected)`);
             }
 
             // AVAILABLE: Charger stopped and ready for next session
@@ -987,10 +1196,10 @@ wss.on('connection', (ws, req) => {
                 broadcastToDashboards({
                     type: 'status',
                     chargerId: chargerId,
-                    status: 'Online',
-                    message: 'Charger stopped and ready'
+                    status: 'Online',  // Map OCPP "Available" to UI "Online"
+                    message: 'Ready for charging'
                 });
-                console.log('📤 Sent "Available" status to dashboard');
+                console.log('📤 Sent "Online" status to dashboard (charger available)');
             }
 
             ws.send(JSON.stringify([3, uniqueId, { "currentTime": new Date().toISOString() }]));
