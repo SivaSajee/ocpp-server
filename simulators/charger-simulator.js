@@ -43,21 +43,22 @@ function sendMessage(messageType, uniqueId, action, payload) {
 function sendBootNotification() {
     console.log('📤 Sending BootNotification...');
     sendMessage(2, 'boot-' + Date.now(), 'BootNotification', {
-        chargePointVendor: 'SimulatorVendor',
-        chargePointModel: 'SimulatorModel',
-        chargePointSerialNumber: 'SIM-001',
-        firmwareVersion: '1.0.0'
+        chargePointVendor: 'EVCharger Pro',
+        chargePointModel: 'ECP-7000',
+        chargePointSerialNumber: `SN-${CHARGER_ID}-2024`,
+        firmwareVersion: 'v2.1.4-stable'
     });
 
     // Start meter values and dlb reporting immediately
     startMeterValues();
 }
 
-function sendStatusNotification(status) {
-    console.log(`📊 Sending StatusNotification: ${status}`);
+function sendStatusNotification(status, errorCode = 'NoError', info = '') {
+    console.log(`📊 Sending StatusNotification: ${status} (Error: ${errorCode})`);
     sendMessage(2, 'status-' + Date.now(), 'StatusNotification', {
         connectorId: 1,
-        errorCode: 'NoError',
+        errorCode: errorCode,
+        info: info,
         status: status,
         timestamp: new Date().toISOString()
     });
@@ -248,17 +249,19 @@ function handleMessage(message) {
         }]));
     }
 
-    // Handle SetChargingProfile (Z-BOX Workaround)
+    // Handle SetChargingProfile (DLB & Stop Commands)
     else if (action === 'SetChargingProfile') {
-        console.log(`⚡ SetChargingProfile received`);
-
-        // Check if this is a "stop" profile (0A or 0W limit)
         const profile = payload.csChargingProfiles;
         const limit = profile?.chargingSchedule?.chargingSchedulePeriod?.[0]?.limit;
         const unit = profile?.chargingSchedule?.chargingRateUnit;
+        const purpose = profile?.chargingProfilePurpose;
+
+        // Convert to Amps for display if in Watts
+        const limitAmps = unit === 'W' ? (limit / 230).toFixed(1) : limit;
+        const limitWatts = unit === 'A' ? (limit * 230).toFixed(0) : limit;
 
         if (limit === 0) {
-            console.log(`🛑 STOP PROFILE DETECTED: 0${unit} limit - Stopping transaction...`);
+            console.log(`🛑 STOP PROFILE: 0${unit} - Stopping transaction...`);
             ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
 
             // Stop the transaction after accepting the profile
@@ -266,7 +269,10 @@ function handleMessage(message) {
                 stopTransaction();
             }, 1000);
         } else {
-            console.log(`📊 Charging profile set: ${limit}${unit}`);
+            console.log(`⚡ SetChargingProfile received`);
+            console.log(`   Purpose: ${purpose}`);
+            console.log(`   Limit: ${limitWatts}W (${limitAmps}A)`);
+            console.log(`   Unit: ${unit}`);
             ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
         }
     }
@@ -282,14 +288,36 @@ setInterval(() => {
 // Connect to server
 connect();
 
-console.log('🎮 OCPP Charger Simulator Started');
-console.log('📊 Charger ID:', CHARGER_ID);
-console.log('🔗 Server URL:', SERVER_URL);
-console.log('');
-console.log('💡 The simulator will:');
-console.log('   1. Connect to your server');
-console.log('   2. Wait for RemoteStartTransaction');
-console.log('   3. Simulate vehicle connection (2 seconds)');
-console.log('   4. Start charging with realistic data');
-console.log('   5. Send meter values every 10 seconds');
-console.log('');
+// Interactive REPL for simulator
+const readline = require('readline');
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false
+});
+
+console.log('⌨️  Commands: fault <errorCode> [info], clear, start, stop, help');
+
+rl.on('line', (line) => {
+    const args = line.trim().split(' ');
+    const cmd = args[0].toLowerCase();
+
+    if (cmd === 'fault') {
+        const errorCode = args[1] || 'OtherError';
+        const info = args.slice(2).join(' ') || 'Fault triggered manually';
+        sendStatusNotification('Faulted', errorCode, info);
+    } else if (cmd === 'clear') {
+        sendStatusNotification(isCharging ? 'Charging' : 'Available', 'NoError');
+    } else if (cmd === 'start') {
+        startTransaction();
+    } else if (cmd === 'stop') {
+        stopTransaction();
+    } else if (cmd === 'help') {
+        console.log('Commands:');
+        console.log('  fault <errorCode> [info] - Send StatusNotification with fault');
+        console.log('  clear                    - Clear current fault (send NoError)');
+        console.log('  start                    - Start a charging transaction');
+        console.log('  stop                     - Stop the current transaction');
+        console.log('  help                     - Show this help message');
+    }
+});

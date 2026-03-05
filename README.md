@@ -8,16 +8,21 @@ A comprehensive **OCPP 1.6 WebSocket Server** with a real-time dashboard for man
 - **OCPP 1.6J Protocol Support** - Full implementation of OCPP 1.6 JSON over WebSocket
 - **Real-time Charger Management** - Monitor and control multiple charging stations simultaneously
 - **Remote Start/Stop** - Initiate and terminate charging sessions remotely
-- **Transaction Management** - Track charging sessions with detailed metrics
-- **Dynamic Load Balancing (DLB)** - Intelligent power distribution across multiple chargers
+- **RFID Bind Feature** - Secure RFID tag whitelist management for authorized charging
+- **Advanced DLB Modes** - Support for PV Dynamic Balance, Extreme Mode, Night Full Speed, and Anti Overload
+- **Fault & Diagnostic Management** - Real-time severity-based fault detection and diagnostic data parsing
+- **Charging Timer** - Schedule charging sessions with custom start/stop times
 
 ### Dashboard Features
 - **Live Charger Status** - Real-time monitoring of charger availability and state
 - **Meter Values Display** - Live voltage, current, power, and energy consumption
 - **Charging History** - Per-charger historical data with graphical visualization
-- **Transaction Logs** - Detailed records of all charging sessions
-- **CSV Export** - Download charging history for analysis
-- **Responsive UI** - Modern, mobile-friendly interface
+- **Transaction Logs** - Detailed records of all charging sessions with session filtering
+- **CSV Export** - Download charging history for offline analysis
+- **Mobile Optimized UI** - Premium, responsive interface tailored for both desktop and mobile use, featuring a refined history view
+- **Settings Management** - Configure LED brightness, spot tariffs, and power limits via UI
+- **Configurable Main Fuse** - Manage main fuse rating constraints directly from the dashboard for accurate DLB calculations
+- **Fault Diagnostics** - Interactive fault UI banner providing real-time severity-based alerts and detailed fault history logs
 
 ### Technical Features
 - **MongoDB Integration** - Persistent storage for transactions and charger data
@@ -111,15 +116,24 @@ The simulator will:
 ```
 ocpp-server/
 ├── server.js              # Main OCPP server and HTTP server
-├── database.js            # MongoDB connection and operations
-├── dashboard.html         # Web dashboard UI
-├── charger-simulator.js   # Charger simulator for testing
-├── public/                # Static assets
-│   ├── css/              # Dashboard stylesheets
-│   └── js/               # Dashboard JavaScript
-├── .env                   # Environment configuration (not in repo)
-├── .env.example          # Example environment configuration
-└── package.json          # Project dependencies and scripts
+├── src/                   # Source code modules
+│   ├── config/           # App configuration and environment setup
+│   ├── constants/        # OCPP protocol constants and error codes
+│   ├── db/               # MongoDB schema and connection logic
+│   ├── handlers/         # OCPP (Authorize, Heartbeat) and UI handlers
+│   ├── routes/           # API endpoint routing and static file serving
+│   ├── services/         # Core business logic (Charger & DLB services)
+│   └── utils/            # Helper functions (Time conversion, logging)
+├── views/                 # HTML templates
+│   └── dashboard.html    # Web dashboard UI
+├── simulators/            # Testing and simulation tools
+│   └── charger-simulator.js  # Dedicated charger simulator
+├── public/                # Static assets served to dashboard
+│   ├── css/              # Visual styles (dashboard.css, components.css)
+│   └── js/               # Frontend logic (dashboard.js, animations.js)
+├── .env                   # Local configuration (secrets & URIs)
+├── .env.example          # Template for environment configuration
+└── package.json          # Dependency management and scripts
 ```
 
 ## 🔧 Configuration
@@ -174,11 +188,22 @@ ocpp-server/
 
 ### HTTP
 - `GET /` - Dashboard UI
-- `GET /api/chargers` - List all chargers
-- `GET /api/transactions` - Get transaction history
-- `GET /api/history/:chargerId` - Get charger-specific history
-- `POST /api/start/:chargerId` - Start charging session
-- `POST /api/stop/:chargerId` - Stop charging session
+- `GET /api/chargers/all` - List all connected chargers with status
+- `GET /api/history` - Get charging session history
+- `GET /api/history/chargers` - List chargers with history records
+- `GET /api/history/download` - Export charger history as JSON/CSV
+- `GET /api/dlb/status` - Current DLB status and power distribution
+- `POST /api/dlb/config` - Update Dynamic Load Balancing settings
+- `GET /api/settings/power-limit` - Fetch current system power limits
+- `POST /api/settings/power-limit` - Update system-wide power limits
+- `GET /api/settings/charger` - Get specific charger configuration
+- `POST /api/settings/charger` - Update charger settings (Timer, Speed, etc.)
+- `POST /api/settings/rfid/add` - Whitelist a new RFID tag
+- `POST /api/settings/rfid/remove` - Remove an RFID tag from whitelist
+- `GET /api/faults` - Retrieve active charger faults
+- `POST /api/faults/clear` - Clear fault logs
+- `GET /api/firmware/repositories` - List available firmware versions
+- `POST /api/firmware/update` - Trigger OTA firmware upgrade
 
 ## 🧪 Testing
 
@@ -211,16 +236,23 @@ npm run dev
 ### Collections
 
 #### `chargers`
-Stores charger registration and status information.
+Stores charger registration, connectivity status, and hardware metadata.
 
-#### `transactions`
-Stores charging session data including:
-- Transaction ID
-- Charger ID
-- Start/stop timestamps
-- Energy consumed
-- Meter values
-- RFID tag information
+#### `sessions`
+Stores detailed charging session data including:
+- Transaction ID & Connector
+- Start/Stop Timestamps & Durations
+- Energy Consumption (kWh)
+- Phased Meter Values (Voltage, Current, Power)
+- User Identification (RFID Tag)
+- Session Stop Reason
+
+#### `settings`
+Persisted system and charger-specific configurations:
+- Load Balancing Modes
+- Dynamic Power Limits
+- RFID Whitelists
+- Specialized Timers & Schedules
 
 ## 🌐 Network Configuration
 

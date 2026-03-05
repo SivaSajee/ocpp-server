@@ -6,7 +6,7 @@
     "scripts": {
         "start": "node server.js",
         "dev": "node server.js",
-        "simulator": "node charger-simulator.js"
+        "simulator": "node simulators/charger-simulator.js"
     },
     "keywords": [
         "ocpp",

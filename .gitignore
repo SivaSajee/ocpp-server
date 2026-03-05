@@ -6,6 +6,7 @@ node_modules/
 
 # Logs
 *.log
+logs/
 npm-debug.log*
 
 # OS files
