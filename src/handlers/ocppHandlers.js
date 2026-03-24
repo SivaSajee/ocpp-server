@@ -35,7 +35,16 @@ async function handleBootNotification(ws, uniqueId, payload, chargerId) {
             if (savedSettings) {
                 // Merge saved settings — persisted fields override defaults,
                 // but we keep any new default fields added since last save.
+                // ⚠️ CRITICAL: We MUST NOT let old firmwareVersion from DB overwrite 
+                // the fresh one we just got from the BootNotification payload!
+                const currentFirmware = charger.settings.firmwareVersion;
                 charger.settings = { ...charger.settings, ...savedSettings };
+                if (currentFirmware) {
+                    charger.settings.firmwareVersion = currentFirmware;
+                }
+                if (savedSettings.dlbModes) {
+                    charger.dlbModes = savedSettings.dlbModes;
+                }
                 const tagCount = charger.settings.rfidWhitelist?.length || 0;
                 console.log(`💾 [${chargerId}] Restored settings from MongoDB (${tagCount} RFID tag${tagCount !== 1 ? 's' : ''} in whitelist)`);
                 if (tagCount > 0) {
@@ -124,7 +133,7 @@ function handleMeterValues(ws, uniqueId, payload, chargerId) {
             type: 'dlb',
             chargerId: chargerId,
             data: charger.dlbState,
-            modes: dlbConfig.modes
+            modes: charger.dlbModes
         });
 
         // Update charger metadata
@@ -747,6 +756,19 @@ function handleCommandResponse(payload, uniqueId, chargerId) {
     } else if (payload && payload.status === 'Accepted') {
         console.log('✅ Command ACCEPTED by charger');
 
+        // --- PERSISTENT MODE SWITCH LOGIC ---
+        if (uniqueId.startsWith('mode-switch-config-')) {
+            console.log(`📡 [${chargerId}] NetWorkSetting ACCEPTED. Sending Soft Reset in 1s...`);
+            setTimeout(() => {
+                const resetMsgId = `mode-switch-reset-${Date.now()}`;
+                const resetMsg = [2, resetMsgId, 'Reset', { type: 'Soft' }];
+                if (charger && charger.socket && charger.socket.readyState === 1) {
+                    charger.socket.send(JSON.stringify(resetMsg));
+                    console.log(`📤 Sent Soft Reset to ${chargerId} (ID: ${resetMsgId})`);
+                }
+            }, 1000);
+        }
+
         if (charger && charger.pendingStopFallback) {
             charger.pendingStopFallback = false;
             console.log('   ✅ Cancelled fallback (command accepted)');
@@ -813,10 +835,19 @@ function sendUpdateFirmware(chargerId, firmwareUrl, retryInterval = 120) {
     const charger = getCharger(chargerId);
     if (!charger || !charger.socket) {
         console.error(`❌ [${chargerId}] Cannot send UpdateFirmware - charger not connected`);
-        return false;
+        return { success: false, error: 'Charger not connected' };
     }
 
-    const retrieveDate = new Date(Date.now() + 60000).toISOString(); // Start download in 1 minute
+    // Z-Beny Requirement: Charger must be in Available (Idle) state
+    if (charger.status !== 'Available') {
+        console.warn(`⚠️ [${chargerId}] Firmware update rejected: Charger is currently ${charger.status} (must be Available)`);
+        return { success: false, error: `Charger is ${charger.status}. Please stop charging/sessions before updating.` };
+    }
+
+    // Offset of 10-15 seconds is usually enough for the charger to prepare
+    const startOffsetMs = 15000;
+    const retrieveDate = new Date(Date.now() + startOffsetMs).toISOString();
+    
     const updateMessage = [2, "update-firmware-" + Date.now(), "UpdateFirmware", {
         location: firmwareUrl,
         retries: 3,
@@ -826,24 +857,29 @@ function sendUpdateFirmware(chargerId, firmwareUrl, retryInterval = 120) {
 
     console.log(`📦 [${chargerId}] Sending UpdateFirmware command:`);
     console.log(`   🔗 URL: ${firmwareUrl}`);
-    console.log(`   ⏰ Start time: ${retrieveDate}`);
+    console.log(`   ⏰ Start time: ${retrieveDate} (in ${startOffsetMs / 1000}s)`);
     console.log(`   🔄 Retry interval: ${retryInterval}s`);
 
-    charger.socket.send(JSON.stringify(updateMessage));
+    try {
+        charger.socket.send(JSON.stringify(updateMessage));
 
-    // Update charger firmware status
-    charger.firmwareStatus = 'DownloadScheduled';
+        // Update charger firmware status
+        charger.firmwareStatus = 'DownloadScheduled';
 
-    // Broadcast status to dashboard
-    broadcastToDashboards({
-        type: 'firmwareStatus',
-        chargerId: chargerId,
-        status: 'DownloadScheduled',
-        url: firmwareUrl,
-        retrieveDate: retrieveDate
-    });
+        // Broadcast status to dashboard
+        broadcastToDashboards({
+            type: 'firmwareStatus',
+            chargerId: chargerId,
+            status: 'DownloadScheduled',
+            url: firmwareUrl,
+            retrieveDate: retrieveDate
+        });
 
-    return true;
+        return { success: true };
+    } catch (err) {
+        console.error(`❌ [${chargerId}] Failed to send UpdateFirmware message:`, err.message);
+        return { success: false, error: 'Socket communication error' };
+    }
 }
 
 // Calculate current tariff rate based on time and charger settings
@@ -979,25 +1015,69 @@ function sendSpotTariffConfig(chargerId, tariffSettings) {
     }
 }
 
-module.exports = {
-    handleBootNotification,
-    handleAuthorize,
-    handleHeartbeat,
-    handleMeterValues,
-    handleStartTransaction,
-    handleStopTransaction,
-    handleStatusNotification,
-    handleCommandResponse,
-    handleConfigResponse,
-    handleDiagResponse,
-    handleFirmwareStatusNotification,
-    sendUpdateFirmware,
-    sendLEDBrightnessControl,
-    sendSpotTariffConfig,
-    calculateCurrentTariff,
-    isCurrentlyPeakTime,
-    checkAllChargersBrightness
-};
+// Send DLB Hardware Configuration (ChangeConfiguration batch)
+// Configures the charger's built-in DLB hardware chip via OCPP ChangeConfiguration.
+// All values must be sent as strings per OCPP 1.6 spec.
+function sendDLBHardwareConfig(chargerId, options = {}) {
+    const charger = getCharger(chargerId);
+    if (!charger?.socket) {
+        console.error(`❌ [${chargerId}] Cannot send DLB hardware config: charger not connected`);
+        return false;
+    }
+
+    const {
+        dlbEnabled = true,
+        normalModeMaxCurrent = 32,
+        dlbType = 1,
+        pvModeMaxGridCurrent = 99,
+        dataTransferInterval = 30
+    } = options;
+
+    // Build list of ChangeConfiguration commands to send in sequence
+    // DLBAPPConfigEnabled must go first — it unlocks remote config priority over hardware defaults
+    const configs = [
+        { key: 'DLBAPPConfigEnabled', value: 'true' },
+        { key: 'DLBEnabled', value: dlbEnabled ? 'true' : 'false' },
+        { key: 'DLBNormalModeMaxCurrent', value: String(normalModeMaxCurrent) },
+        { key: 'DLBType', value: String(dlbType) },
+        { key: 'DLBPVModeMaxGridCurrent', value: String(pvModeMaxGridCurrent) },
+        { key: 'DLBDataTransferInterval', value: String(dataTransferInterval) }
+    ];
+
+    console.log(`⚙️ [${chargerId}] Sending DLB hardware configuration (${configs.length} keys)...`);
+
+    // Stagger each command by 200ms to avoid flooding the charger
+    configs.forEach((cfg, index) => {
+        setTimeout(() => {
+            const uniqueId = `dlbcfg-${cfg.key}-${Date.now()}`;
+            const message = [2, uniqueId, 'ChangeConfiguration', {
+                key: cfg.key,
+                value: cfg.value
+            }];
+            try {
+                charger.socket.send(JSON.stringify(message));
+                console.log(`   📤 [${chargerId}] ChangeConfiguration → ${cfg.key} = "${cfg.value}"`);
+            } catch (err) {
+                console.error(`   ❌ [${chargerId}] Failed to send ${cfg.key}:`, err.message);
+            }
+        }, index * 1200);
+    });
+
+    // Broadcast to dashboard so UI can show confirmation
+    broadcastToDashboards({
+        type: 'dlbHardwareConfigSent',
+        chargerId,
+        config: {
+            dlbEnabled,
+            normalModeMaxCurrent,
+            dlbType,
+            pvModeMaxGridCurrent,
+            dataTransferInterval
+        },
+        timestamp: new Date().toISOString()
+    });
+
+}
 
 // Check and apply LED brightness for all chargers based on time
 function checkAllChargersBrightness() {
@@ -1043,3 +1123,24 @@ function checkAndApplyLEDBrightness(charger, chargerId) {
         sendLEDBrightnessControl(chargerId, targetBrightness);
     }
 }
+
+module.exports = {
+    handleBootNotification,
+    handleAuthorize,
+    handleHeartbeat,
+    handleMeterValues,
+    handleStartTransaction,
+    handleStopTransaction,
+    handleStatusNotification,
+    handleCommandResponse,
+    handleConfigResponse,
+    handleDiagResponse,
+    handleFirmwareStatusNotification,
+    sendUpdateFirmware,
+    sendLEDBrightnessControl,
+    sendSpotTariffConfig,
+    sendDLBHardwareConfig,
+    calculateCurrentTariff,
+    isCurrentlyPeakTime,
+    checkAllChargersBrightness
+};

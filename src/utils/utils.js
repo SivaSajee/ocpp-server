@@ -1,3 +1,5 @@
+const os = require('os');
+
 // Helper function to convert UTC to IST (UTC+5:30)
 function toIST(date) {
     const utcDate = new Date(date);
@@ -6,4 +8,19 @@ function toIST(date) {
     return istDate.toISOString().replace('Z', '+05:30');
 }
 
-module.exports = { toIST };
+// Get the local IPv4 address
+function getLocalIP() {
+    const interfaces = os.networkInterfaces();
+    for (const devName in interfaces) {
+        const iface = interfaces[devName];
+        for (let i = 0; i < iface.length; i++) {
+            const alias = iface[i];
+            if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+                return alias.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+
+module.exports = { toIST, getLocalIP };

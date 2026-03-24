@@ -1,5 +1,6 @@
 const { toIST } = require('../utils/utils');
-const { saveChargingSession } = require('../db/database');
+const { saveChargingSession, saveChargerSettings } = require('../db/database');
+const { CONFIG } = require('../config/config');
 const {
     getCharger,
     getChargerList,
@@ -168,9 +169,137 @@ function processDashboardMessage(message, chargerId) {
         case 'CANCEL_TIMER':
             handleCancelTimer(targetChargerId);
             break;
+        case 'ENABLE_DLB':
+            handleEnableDLB(targetChargerId, command.fuseAmps);
+            break;
+        case 'DISABLE_DLB':
+            handleDisableDLB(targetChargerId);
+            break;
+        case 'UPDATE_DLB_MODE':
+            handleUpdateDLBMode(targetChargerId, command.mode, command.value);
+            break;
+        case 'UPDATE_FUSE_RATING':
+            handleUpdateFuseRating(targetChargerId, command.fuseAmps);
+            break;
         default:
             console.log(`⚠️ Unknown dashboard command: ${command.action}`);
     }
+}
+
+// --- DLB Control Handlers ---
+
+function handleEnableDLB(chargerId, fuseAmps) {
+    const charger = getCharger(chargerId);
+    if (!charger || !charger.socket) return;
+    
+    const amps = fuseAmps || 32;
+    console.log(`⚡ Dashboard Command: Enabling DLB for ${chargerId} with breaker ${amps}A`);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBAPPConfigEnabled", value: "true" }]));
+    }, 500);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBEnabled", value: "true" }]));
+    }, 2000);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBNormalModeMaxCurrent", value: String(amps) }]));
+    }, 3500);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBPVModeMaxGridCurrent", value: CONFIG.DLB_PV_MODE_MAX_GRID_CURRENT }]));
+    }, 5000);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBDataTransferInterval", value: CONFIG.DLB_DATA_TRANSFER_INTERVAL }]));
+    }, 6500);
+    
+    setTimeout(() => {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "DLBDataTransferAnytimeEnabled", value: CONFIG.DLB_DATA_TRANSFER_ANYTIME_ENABLED }]));
+    }, 8000);
+
+    setTimeout(() => {
+        console.log(`⚙️ [${chargerId}] Overriding UserCurrentLimit to ${amps}A`);
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", { key: "UserCurrentLimit", value: String(amps) }]));
+    }, 9500);
+    
+    if (!charger.settings) charger.settings = {};
+    charger.settings.mainFuseAmps = amps;
+    charger.settings.dlbEnabled = true;
+    
+    saveChargerSettings(chargerId, charger.settings);
+    broadcastToDashboards({ type: 'settingsUpdate', chargerId: chargerId, settings: charger.settings });
+}
+
+function handleDisableDLB(chargerId) {
+    const charger = getCharger(chargerId);
+    if (!charger || !charger.socket) return;
+    
+    console.log(`⚡ Dashboard Command: Disabling DLB for ${chargerId}`);
+    charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
+        key: "DLBEnabled", value: "false"
+    }]));
+    
+    if (!charger.settings) charger.settings = {};
+    charger.settings.dlbEnabled = false;
+    
+    saveChargerSettings(chargerId, charger.settings);
+    broadcastToDashboards({ type: 'settingsUpdate', chargerId: chargerId, settings: charger.settings });
+}
+
+function handleUpdateDLBMode(chargerId, mode, value) {
+    const charger = getCharger(chargerId);
+    if (!charger) return;
+    
+    if (!charger.dlbModes) charger.dlbModes = {};
+    
+    const EXCLUSIVE = ['pvDynamicBalance', 'extremeMode', 'nightFullSpeed'];
+    if (EXCLUSIVE.includes(mode) && value === true) {
+        EXCLUSIVE.forEach(m => { charger.dlbModes[m] = false; });
+    }
+    
+    charger.dlbModes[mode] = value;
+    console.log(`⚡ Dashboard Command: Updated DLB mode ${mode} = ${value} for ${chargerId}`);
+    
+    if (!charger.settings) charger.settings = {};
+    charger.settings.dlbModes = charger.dlbModes;
+    saveChargerSettings(chargerId, charger.settings);
+    
+    broadcastToDashboards({
+        type: 'chargerList',
+        chargers: getChargerList()
+    });
+    
+    broadcastToDashboards({
+        type: 'dlbConfig',
+        chargerId: chargerId,
+        modes: charger.dlbModes
+    });
+}
+
+function handleUpdateFuseRating(chargerId, fuseAmps) {
+    const charger = getCharger(chargerId);
+    if (!charger) return;
+    
+    if (!charger.settings) charger.settings = {};
+    charger.settings.mainFuseAmps = fuseAmps;
+    
+    if (charger.socket) {
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
+            key: "DLBNormalModeMaxCurrent", value: String(fuseAmps)
+        }]));
+        // Also override the persistent UserCurrentLimit ceiling
+        charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
+            key: "UserCurrentLimit", value: String(fuseAmps)
+        }]));
+    }
+    console.log(`⚡ Dashboard Command: Updated main fuse rating to ${fuseAmps}A for ${chargerId}`);
+    
+    broadcastToDashboards({
+        type: 'chargerList',
+        chargers: getChargerList()
+    });
 }
 
 module.exports = {

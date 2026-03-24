@@ -57,6 +57,14 @@ function goToScreen(screenName) {
         document.getElementById('dlbView').style.display = 'block';
         document.getElementById('nav-dlb').classList.add('active');
         fetchDLBStatus();
+        // Show which charger's DLB is being viewed
+        const dlbNameEl = document.getElementById('dlb-charger-name');
+        if (dlbNameEl && selectedChargerId) {
+            const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+            const name = savedNames[selectedChargerId] || selectedChargerId;
+            dlbNameEl.textContent = '⚡ ' + name;
+            dlbNameEl.style.display = 'block';
+        }
     }
     else if (screenName === 'setting') {
         if (document.getElementById('settingView')) {
@@ -64,6 +72,14 @@ function goToScreen(screenName) {
         }
         if (document.getElementById('nav-setting')) {
             document.getElementById('nav-setting').classList.add('active');
+        }
+        // Show which charger's settings are being viewed
+        const settingNameEl = document.getElementById('setting-charger-name');
+        if (settingNameEl && selectedChargerId) {
+            const savedNames = JSON.parse(localStorage.getItem('chargerNames') || '{}');
+            const name = savedNames[selectedChargerId] || selectedChargerId;
+            settingNameEl.textContent = '⚙️ ' + name;
+            settingNameEl.style.display = 'block';
         }
         // Load charger-specific power limit
         loadChargerPowerLimit();
@@ -324,6 +340,17 @@ ws.onmessage = (event) => {
         return;
     }
 
+    // 3b. DLB HARDWARE STATE - syncs across all dashboards (phone + laptop)
+    if (data.type === 'dlbHardwareState') {
+        if (data.chargerId && chargersData[data.chargerId]) {
+            chargersData[data.chargerId].dlbHardwareEnabled = data.enabled;
+        }
+        if (data.chargerId === selectedChargerId) {
+            refreshDLBWizardState(data.enabled);
+        }
+        return;
+    }
+
 
 
     // 4. DLB CONFIG UPDATE
@@ -395,6 +422,10 @@ ws.onmessage = (event) => {
         // Only update UI if this is for the currently selected charger
         if (data.chargerId === selectedChargerId) {
             updateSettingsToggles(data.settings);
+            if (data.settings && data.settings.dlbEnabled !== undefined) {
+                refreshDLBWizardState(data.settings.dlbEnabled);
+                localStorage.setItem(`dlbEnabled_${data.chargerId}`, data.settings.dlbEnabled ? 'true' : 'false');
+            }
         }
         return;
     }
@@ -422,6 +453,14 @@ ws.onmessage = (event) => {
                 document.getElementById('current-firmware-version').textContent = data.firmwareVersion;
             }
             console.log(`✅ [${data.chargerId}] Firmware version updated: ${data.firmwareVersion}`);
+        }
+        return;
+    }
+
+    // 8. FIRMWARE STATUS UPDATE
+    if (data.type === 'firmwareStatus') {
+        if (data.chargerId === selectedChargerId) {
+            updateFirmwareProgressUI(data.status);
         }
         return;
     }
@@ -587,6 +626,9 @@ function updateStatusUI(status) {
     } else if (status === 'Offline') {
         label = 'Offline';
         color = '#ef4444';
+    } else if (status === 'Disconnecting...') {
+        label = 'Switching to Bluetooth...';
+        color = '#6366f1'; // Indigo color for transition
     }
 
     if (gaugeStatusText) {
@@ -621,7 +663,8 @@ function updateChargerDataFromList(chargers) {
                 activeTimer: c.activeTimer,
                 timerSetAt: c.timerSetAt,
                 currentFault: c.currentFault !== undefined ? c.currentFault : chargersData[c.id].currentFault,
-                faultHistory: c.faultHistory !== undefined ? c.faultHistory : chargersData[c.id].faultHistory
+                faultHistory: c.faultHistory !== undefined ? c.faultHistory : chargersData[c.id].faultHistory,
+                dlbHardwareEnabled: c.dlbHardwareEnabled !== undefined ? c.dlbHardwareEnabled : chargersData[c.id].dlbHardwareEnabled
             });
 
             // If this charger is currently displayed in detail view, refresh its fault banner
@@ -1683,8 +1726,19 @@ async function updateFuseRating() {
 function checkDLBVisibility() {
     const overlay = document.getElementById('dlb-offline-overlay');
     const content = document.getElementById('dlb-content');
+    const wizardEnable = document.getElementById('dlb-wizard-enable');
+    const wizardCurrent = document.getElementById('dlb-wizard-current');
+    const wizardStatus = document.getElementById('dlb-wizard-status');
+
+    // Helper: hide all wizard panels
+    function hideWizard() {
+        if (wizardEnable) wizardEnable.style.display = 'none';
+        if (wizardCurrent) wizardCurrent.style.display = 'none';
+        if (wizardStatus) wizardStatus.style.display = 'none';
+    }
 
     if (!selectedChargerId) {
+        hideWizard();
         if (content) content.style.display = 'none';
         if (overlay) {
             overlay.style.display = 'block';
@@ -1698,6 +1752,7 @@ function checkDLBVisibility() {
     const isOnline = charger && charger.status !== 'Offline' && charger.status !== 'Unknown';
 
     if (!isOnline) {
+        hideWizard();
         if (content) content.style.display = 'none';
         if (overlay) {
             overlay.style.display = 'block';
@@ -1705,9 +1760,232 @@ function checkDLBVisibility() {
             overlay.querySelector('p').innerText = "This charger is currently offline. DLB data is unavailable until it reconnects.";
         }
     } else {
-        if (content) content.style.display = 'block';
         if (overlay) overlay.style.display = 'none';
+        // Show wizard or content depending on configuration state
+        initDLBWizard();
     }
+}
+
+// ═══════════════════════════════════════════════════════
+// DLB SETUP WIZARD FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+function _showDLBContent() {
+    const content = document.getElementById('dlb-content');
+    const wizardEnable = document.getElementById('dlb-wizard-enable');
+    const wizardCurrent = document.getElementById('dlb-wizard-current');
+    const wizardStatus = document.getElementById('dlb-wizard-status');
+    if (wizardEnable) wizardEnable.style.display = 'none';
+    if (wizardCurrent) wizardCurrent.style.display = 'none';
+    if (wizardStatus) wizardStatus.style.display = 'none';
+    if (content) content.style.display = 'block';
+}
+
+function _showDLBWizardStep0() {
+    const content = document.getElementById('dlb-content');
+    const wizardEnable = document.getElementById('dlb-wizard-enable');
+    const wizardCurrent = document.getElementById('dlb-wizard-current');
+    const wizardStatus = document.getElementById('dlb-wizard-status');
+    if (wizardEnable) wizardEnable.style.display = 'block';
+    if (wizardCurrent) wizardCurrent.style.display = 'none';
+    if (wizardStatus) wizardStatus.style.display = 'none';
+    if (content) content.style.display = 'none';
+    const toggle = document.getElementById('dlb-master-toggle');
+    if (toggle) toggle.checked = false;
+}
+
+async function initDLBWizard() {
+    if (!selectedChargerId) return;
+    try {
+        const resp = await fetch(`/api/dlb/configured?chargerId=${encodeURIComponent(selectedChargerId)}`);
+        const data = await resp.json();
+        if (data.configured) {
+            _showDLBContent();
+        } else {
+            _showDLBWizardStep0();
+        }
+    } catch (err) {
+        console.warn('Could not load DLB configured state:', err.message);
+        // Fall back to showing wizard on error
+        _showDLBWizardStep0();
+    }
+}
+
+function onDLBEnableToggle(checked) {
+    if (checked) {
+        // Show confirm modal
+        const modal = document.getElementById('dlb-confirm-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+    // If unchecked, do nothing — toggle stays off
+}
+
+function closeDLBConfirm() {
+    const modal = document.getElementById('dlb-confirm-modal');
+    if (modal) modal.style.display = 'none';
+    // Revert toggle
+    const toggle = document.getElementById('dlb-master-toggle');
+    if (toggle) toggle.checked = false;
+}
+
+function confirmDLBEnable() {
+    // Close confirm modal
+    const modal = document.getElementById('dlb-confirm-modal');
+    if (modal) modal.style.display = 'none';
+
+    // Show rated current input panel
+    const wizardEnable = document.getElementById('dlb-wizard-enable');
+    const wizardCurrent = document.getElementById('dlb-wizard-current');
+    if (wizardEnable) wizardEnable.style.display = 'none';
+    if (wizardCurrent) wizardCurrent.style.display = 'block';
+
+    // Reset input state
+    const errEl = document.getElementById('dlb-wizard-error');
+    if (errEl) errEl.style.display = 'none';
+    const btnText = document.getElementById('dlb-wizard-btn-text');
+    if (btnText) btnText.innerText = 'Apply Configuration →';
+}
+
+async function dlbWizardContinue() {
+    if (!selectedChargerId) return;
+
+    const input = document.getElementById('dlb-wizard-amps');
+    const errEl = document.getElementById('dlb-wizard-error');
+    const btnText = document.getElementById('dlb-wizard-btn-text');
+    const btn = input?.closest('.dlb-wizard-panel')?.querySelector('.dlb-wizard-btn');
+
+    const amps = parseInt(input?.value);
+    if (isNaN(amps) || amps < 6 || amps > 200) {
+        if (errEl) { errEl.innerText = '⚠️ Enter a value between 6 and 200 A'; errEl.style.display = 'block'; }
+        return;
+    }
+    if (errEl) errEl.style.display = 'none';
+
+    // Disable button and show loading
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.innerText = 'Applying…';
+
+    try {
+        const resp = await fetch('/api/dlb/hardware-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chargerId: selectedChargerId,
+                DLBNormalModeMaxCurrent: String(amps)
+            })
+        });
+        const result = await resp.json();
+        if (!result.success && !result.sent) {
+            throw new Error(result.error || 'API error');
+        }
+    } catch (err) {
+        console.warn('DLB config API error (may still have sent):', err.message);
+        // Continue anyway — commands may still have been sent before error
+    }
+
+    // Show status screen
+    const wizardCurrent = document.getElementById('dlb-wizard-current');
+    const wizardStatus = document.getElementById('dlb-wizard-status');
+    if (wizardCurrent) wizardCurrent.style.display = 'none';
+    if (wizardStatus) wizardStatus.style.display = 'block';
+    if (btn) btn.disabled = false;
+
+    // Reset dots to grey
+    const dot1 = document.getElementById('dlb-dot-1');
+    const dot2 = document.getElementById('dlb-dot-2');
+    const completeBtn = document.getElementById('dlb-complete-btn');
+    if (dot1) dot1.classList.remove('active');
+    if (dot2) dot2.classList.remove('active');
+    if (completeBtn) completeBtn.style.display = 'none';
+
+    // Animate dots sequentially
+    setTimeout(() => {
+        if (dot1) dot1.classList.add('active');
+    }, 700);
+    setTimeout(() => {
+        if (dot2) dot2.classList.add('active');
+    }, 1800);
+    setTimeout(() => {
+        if (completeBtn) completeBtn.style.display = 'block';
+    }, 2400);
+}
+
+async function completeDLBSetup() {
+    if (!selectedChargerId) return;
+
+    // Persist configured flag to MongoDB via server API
+    try {
+        await fetch('/api/dlb/configured', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chargerId: selectedChargerId, configured: true })
+        });
+    } catch (err) {
+        console.warn('Could not persist DLB configured flag:', err.message);
+    }
+
+    // Hide wizard, show power flow
+    const wizardStatus = document.getElementById('dlb-wizard-status');
+    const content = document.getElementById('dlb-content');
+    if (wizardStatus) wizardStatus.style.display = 'none';
+    if (content) content.style.display = 'block';
+
+    // Refresh DLB data
+    fetchDLBStatus();
+    console.log(`✅ DLB setup complete for ${selectedChargerId} (saved to MongoDB)`);
+}
+
+// ── DLB Disable functions ────────────────────────────────────────────────────
+
+function openDisableDLBConfirm() {
+    const modal = document.getElementById('dlb-disable-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDisableDLBConfirm() {
+    const modal = document.getElementById('dlb-disable-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function disableDLBSetup() {
+    if (!selectedChargerId) return;
+
+    // Close confirm modal
+    closeDisableDLBConfirm();
+
+    // 1. Send DLBEnabled=false to the charger via OCPP
+    try {
+        await fetch('/api/dlb/hardware-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chargerId: selectedChargerId,
+                DLBEnabled: 'false',
+                disableOnly: true          // signal to API to only send the disable command
+            })
+        });
+    } catch (err) {
+        console.warn('DLB disable OCPP command error:', err.message);
+        // Continue anyway — still clear the configured flag
+    }
+
+    // 2. Clear the configured flag in MongoDB
+    try {
+        await fetch('/api/dlb/configured', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chargerId: selectedChargerId, configured: false })
+        });
+    } catch (err) {
+        console.warn('Could not clear DLB configured flag:', err.message);
+    }
+
+    // 3. Hide power flow, show wizard Step 0
+    const content = document.getElementById('dlb-content');
+    if (content) content.style.display = 'none';
+    _showDLBWizardStep0();
+
+    console.log(`⛔ DLB disabled for ${selectedChargerId} — wizard reset`);
 }
 
 // ── Fuse rating display / edit helpers ──────────────────────────────────────
@@ -1756,22 +2034,38 @@ function updateDLBUI(chargerId, dlbData, modes) {
     }
 
     // Sync Flow Dots visibility
-    // Grid: Show correct direction based on import/export
-    if (document.getElementById('dot-grid-import') && document.getElementById('dot-grid-export')) {
-        const isImporting = dlbData.gridPower > 100;  // Positive = importing from grid
-        const isExporting = dlbData.gridPower < -100; // Negative = exporting to grid
+    // Rule: Positive = towards hub (inward), Negative = away from hub (outward)
 
-        document.getElementById('dot-grid-import').classList.toggle('active', isImporting);
-        document.getElementById('dot-grid-export').classList.toggle('active', isExporting);
+    // Grid: Positive = Grid → Hub, Negative = Hub → Grid
+    if (document.getElementById('dot-grid-import') && document.getElementById('dot-grid-export')) {
+        const towardsHub = dlbData.gridPower > 100;   // Positive = towards hub
+        const awayFromHub = dlbData.gridPower < -100; // Negative = away from hub
+        document.getElementById('dot-grid-import').classList.toggle('active', towardsHub);
+        document.getElementById('dot-grid-export').classList.toggle('active', awayFromHub);
     }
-    if (document.getElementById('dot-pv')) {
-        document.getElementById('dot-pv').classList.toggle('active', dlbData.pvPower > 100);
+
+    // PV: Positive = PV → Hub, Negative = Hub → PV
+    if (document.getElementById('dot-pv-generate') && document.getElementById('dot-pv-consume')) {
+        const towardsHub = dlbData.pvPower > 100;   // Positive = towards hub
+        const awayFromHub = dlbData.pvPower < -100; // Negative = away from hub
+        document.getElementById('dot-pv-generate').classList.toggle('active', towardsHub);
+        document.getElementById('dot-pv-consume').classList.toggle('active', awayFromHub);
     }
-    if (document.getElementById('dot-charger')) {
-        document.getElementById('dot-charger').classList.toggle('active', dlbData.totalChargerLoad > 100);
+
+    // Charger: Positive = Hub → Charger (consuming), Negative = Charger → Hub (V2G)
+    if (document.getElementById('dot-charger-consume') && document.getElementById('dot-charger-export')) {
+        const awayFromHub = dlbData.totalChargerLoad > 100;   // Positive = away from hub (consuming)
+        const towardsHub = dlbData.totalChargerLoad < -100;   // Negative = towards hub (V2G)
+        document.getElementById('dot-charger-consume').classList.toggle('active', awayFromHub);
+        document.getElementById('dot-charger-export').classList.toggle('active', towardsHub);
     }
-    if (document.getElementById('dot-home')) {
-        document.getElementById('dot-home').classList.toggle('active', dlbData.homeLoad > 100);
+
+    // Home: Positive = Hub → Home (consuming), Negative = Home → Hub (home battery)
+    if (document.getElementById('dot-home-consume') && document.getElementById('dot-home-export')) {
+        const awayFromHub = dlbData.homeLoad > 100;   // Positive = away from hub (consuming)
+        const towardsHub = dlbData.homeLoad < -100;   // Negative = towards hub (home battery)
+        document.getElementById('dot-home-consume').classList.toggle('active', awayFromHub);
+        document.getElementById('dot-home-export').classList.toggle('active', towardsHub);
     }
 }
 
@@ -2000,11 +2294,17 @@ function setDefaultSettings() {
 }
 
 function updateSettingsToggles(settings) {
-    document.getElementById('setting-grounding').checked = settings.groundingDetection;
-    document.getElementById('setting-emergency').checked = settings.emergencyStop;
-    document.getElementById('setting-plug-play').checked = settings.plugAndPlay;
-    document.getElementById('setting-auto-resume').checked = settings.autoResumeAfterPowerLoss;
-    document.getElementById('setting-compatibility').checked = settings.chargingCompatibility;
+    if (!settings) return;
+    if (document.getElementById('setting-grounding'))
+        document.getElementById('setting-grounding').checked = settings.groundingDetection !== false;
+    if (document.getElementById('setting-emergency'))
+        document.getElementById('setting-emergency').checked = settings.emergencyStop !== false;
+    if (document.getElementById('setting-plug-play'))
+        document.getElementById('setting-plug-play').checked = settings.plugAndPlay === true;
+    if (document.getElementById('setting-auto-resume'))
+        document.getElementById('setting-auto-resume').checked = settings.autoResumeAfterPowerLoss !== false;
+    if (document.getElementById('setting-compatibility'))
+        document.getElementById('setting-compatibility').checked = settings.chargingCompatibility === true;
 }
 
 async function saveChargerSetting(settingKey, value) {
@@ -2367,8 +2667,13 @@ async function switchToBluetoothMode() {
         return;
     }
 
+    const confirmBtn = document.querySelector('#bluetooth-modal button[onclick="switchToBluetoothMode()"]');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Switching...';
+    }
+
     try {
-        // Send disconnect command to server
         const response = await fetch('/api/charger/disconnect', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2378,25 +2683,35 @@ async function switchToBluetoothMode() {
             })
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to disconnect charger');
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            // Show the real server error (e.g. "Cannot disconnect while charging")
+            throw new Error(result.error || 'Failed to disconnect charger');
         }
 
-        // Show success message
-        alert(`Charger ${selectedChargerId} has been disconnected from OCPP server. You can now connect directly via Bluetooth using your mobile app.`);
-
-        // Update UI to show disconnected state
-        if (chargersData[selectedChargerId]) {
-            chargersData[selectedChargerId].status = 'Offline';
-            updateStatusUI('Offline');
-            renderChargerListUI();
-        }
-
+        // The UI will now be updated automatically via WebSocket broadcasts
+        // as the charger moves from 'Online' -> 'Disconnecting...' -> 'Offline'
+        
         closeBluetoothModal();
+        console.log(`✅ Transition to Bluetooth mode initiated for ${selectedChargerId}`);
 
     } catch (error) {
         console.error('Switch to Bluetooth mode failed:', error);
-        alert('Failed to switch to Bluetooth mode: ' + error.message);
+        // Show the real error inside the modal instead of a blocking alert
+        const warningDiv = document.querySelector('#bluetooth-modal [style*="fef3c7"]');
+        if (warningDiv) {
+            warningDiv.style.background = '#fee2e2';
+            const iconDiv = warningDiv.querySelector('div[style*="f59e0b"]');
+            const textDiv = warningDiv.querySelector('div[style*="92400e"]');
+            if (iconDiv) iconDiv.style.background = '#ef4444';
+            if (textDiv) { textDiv.style.color = '#991b1b'; textDiv.textContent = '\u274c ' + error.message; }
+        }
+    } finally {
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Confirm';
+        }
     }
 }
 
@@ -2733,7 +3048,8 @@ function closeFirmwareUpgradeModal() {
 async function loadFirmwareRepositories() {
     try {
         const response = await fetch('/api/firmware/repositories');
-        const repositories = await response.json();
+        const data = await response.json();
+        const repositories = data.repositories || [];
 
         const select = document.getElementById('firmware-repository');
         select.innerHTML = '<option value="">Select a repository...</option>';
@@ -2760,7 +3076,8 @@ async function loadFirmwareVersions() {
 
     try {
         const response = await fetch('/api/firmware/repositories');
-        const repositories = await response.json();
+        const data = await response.json();
+        const repositories = data.repositories || [];
         const repository = repositories.find(r => r.id === repositoryId);
 
         if (!repository) return;
@@ -2835,10 +3152,12 @@ async function startAutoFirmwareUpdate() {
         return;
     }
 
-    // Show progress
+    // Show initial progress state
     document.getElementById('firmware-progress').style.display = 'block';
     document.getElementById('firmware-upgrade-btn').disabled = true;
     document.getElementById('firmware-upgrade-btn').textContent = 'Starting Update...';
+    document.getElementById('firmware-progress-bar').style.width = '10%';
+    document.getElementById('firmware-progress-text').textContent = 'Sending Update command to charger...';
 
     try {
         // Send UpdateFirmware command via OCPP
@@ -2848,53 +3167,17 @@ async function startAutoFirmwareUpdate() {
             body: JSON.stringify({
                 chargerId: selectedChargerId,
                 version: selectedFirmwareVersion.version,
-                url: selectedFirmwareVersion.downloadUrl
+                firmwareUrl: selectedFirmwareVersion.url
             })
         });
 
         if (!response.ok) {
-            throw new Error('Failed to initiate firmware update');
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to initiate firmware update');
         }
 
-        // Start progress simulation
-        let progress = 0;
-        let progressStep = 'Sending update command...';
-
-        document.getElementById('firmware-progress-text').textContent = progressStep;
-        document.getElementById('firmware-upgrade-btn').textContent = 'Update in Progress...';
-
-        const updateProgress = () => {
-            if (progress < 30) {
-                progressStep = 'Charger downloading firmware...';
-                progress += Math.random() * 5;
-            } else if (progress < 60) {
-                progressStep = 'Validating firmware file...';
-                progress += Math.random() * 3;
-            } else if (progress < 90) {
-                progressStep = 'Installing firmware...';
-                progress += Math.random() * 2;
-            } else if (progress < 100) {
-                progressStep = 'Finalizing installation...';
-                progress += 1;
-            } else {
-                progressStep = 'Update complete! Charger restarting...';
-                progress = 100;
-                setTimeout(() => {
-                    alert('Firmware auto-update completed successfully! The charger is restarting with the new firmware.');
-                    closeFirmwareUpgradeModal();
-                    document.getElementById('firmware-upgrade-btn').disabled = false;
-                    document.getElementById('firmware-upgrade-btn').textContent = 'Start Auto-Update';
-                }, 2000);
-                return;
-            }
-
-            document.getElementById('firmware-progress-bar').style.width = progress + '%';
-            document.getElementById('firmware-progress-text').textContent = progressStep;
-
-            setTimeout(updateProgress, 800 + Math.random() * 1200);
-        };
-
-        updateProgress();
+        console.log('✅ Firmware update command accepted by server');
+        document.getElementById('firmware-progress-text').textContent = 'Command sent. Waiting for charger response...';
 
     } catch (error) {
         console.error('Firmware update failed:', error);
@@ -2903,6 +3186,64 @@ async function startAutoFirmwareUpdate() {
         document.getElementById('firmware-upgrade-btn').disabled = false;
         document.getElementById('firmware-upgrade-btn').textContent = 'Start Auto-Update';
     }
+}
+
+// Update the firmware progress UI based on OCPP status notifications
+function updateFirmwareProgressUI(status) {
+    const progressBar = document.getElementById('firmware-progress-bar');
+    const progressText = document.getElementById('firmware-progress-text');
+    const upgradeBtn = document.getElementById('firmware-upgrade-btn');
+
+    if (!progressBar || !progressText) return;
+
+    let progress = 0;
+    let text = status;
+
+    switch (status) {
+        case 'DownloadScheduled':
+            progress = 15;
+            text = 'Update scheduled on charger...';
+            break;
+        case 'Downloading':
+            progress = 30;
+            text = 'Charger is downloading firmware...';
+            break;
+        case 'Downloaded':
+            progress = 60;
+            text = 'Firmware downloaded. Verifying...';
+            break;
+        case 'Installing':
+            progress = 80;
+            text = 'Installing firmware update...';
+            break;
+        case 'Installed':
+            progress = 100;
+            text = 'Update installed! Charger is rebooting...';
+            setTimeout(() => {
+                alert('Firmware update complete! The charger is now rebooting with the new version.');
+                closeFirmwareUpgradeModal();
+                // Reset UI for next time
+                upgradeBtn.disabled = false;
+                upgradeBtn.textContent = 'Start Auto-Update';
+                progressBar.style.width = '0%';
+            }, 3000);
+            break;
+        case 'DownloadFailed':
+        case 'InstallationFailed':
+            progress = 100;
+            text = `❌ Error: ${status}`;
+            progressBar.style.backgroundColor = '#ef4444';
+            upgradeBtn.disabled = false;
+            upgradeBtn.textContent = 'Retry Update';
+            alert(`Firmware update failed: ${status}`);
+            break;
+        default:
+            text = `Status: ${status}`;
+    }
+
+    progressBar.style.width = progress + '%';
+    progressText.textContent = text;
+    if (upgradeBtn) upgradeBtn.textContent = 'Updating...';
 }
 
 // Enhanced settings saving with additional settings support
@@ -2942,41 +3283,67 @@ async function saveChargerSetting(settingKey, settingValue) {
     }
 }
 
-// Load charger settings when charger is selected
-async function loadChargerSettings() {
+// --- DLB WIZARD FUNCTIONS ---
+async function fetchDLBStatus() {
     if (!selectedChargerId) return;
-
     try {
-        const response = await fetch(`/api/settings/charger?chargerId=${selectedChargerId}`);
-        const data = await response.json();
-
-        if (data.settings) {
-            // Update toggle switches
-            updateSettingsToggles(data.settings);
-
-            // Update local charger data
-            if (chargersData[selectedChargerId]) {
-                chargersData[selectedChargerId].settings = data.settings;
-            }
-        }
-    } catch (error) {
-        console.log('Using default settings for charger');
-    }
+        const res = await fetch(`/api/dlb/status?chargerId=${selectedChargerId}`);
+        if (res.ok) { const data = await res.json(); if (data && data.dlbEnabled !== undefined) { refreshDLBWizardState(data.dlbEnabled); return; } }
+    } catch (_) {}
+    refreshDLBWizardState(localStorage.getItem(`dlbEnabled_${selectedChargerId}`) === 'true');
 }
-
-// Update settings toggles based on charger data
-function updateSettingsToggles(settings) {
-    if (!settings) return;
-
-    // Update toggle switches
-    if (document.getElementById('setting-grounding'))
-        document.getElementById('setting-grounding').checked = settings.groundingDetection !== false;
-    if (document.getElementById('setting-emergency'))
-        document.getElementById('setting-emergency').checked = settings.emergencyStop !== false;
-    if (document.getElementById('setting-plug-play'))
-        document.getElementById('setting-plug-play').checked = settings.plugAndPlay === true;
-    if (document.getElementById('setting-auto-resume'))
-        document.getElementById('setting-auto-resume').checked = settings.autoResumeAfterPowerLoss !== false;
-    if (document.getElementById('setting-compatibility'))
-        document.getElementById('setting-compatibility').checked = settings.chargingCompatibility === true;
+function checkDLBVisibility() {
+    const charger = selectedChargerId ? chargersData[selectedChargerId] : null;
+    const isOnline = charger && charger.status !== 'Offline' && charger.status !== 'Unknown';
+    const offlineOverlay = document.getElementById('dlb-offline-overlay');
+    const dlbContent = document.getElementById('dlb-content');
+    const enablePanel = document.getElementById('dlb-wizard-enable');
+    if (!offlineOverlay || !dlbContent || !enablePanel) return;
+    if (!isOnline) { offlineOverlay.style.display='block'; dlbContent.style.display='none'; enablePanel.style.display='none'; return; }
+    offlineOverlay.style.display = 'none';
+    refreshDLBWizardState(localStorage.getItem(`dlbEnabled_${selectedChargerId}`) === 'true');
 }
+function refreshDLBWizardState(enabled) {
+    const enablePanel = document.getElementById('dlb-wizard-enable');
+    const dlbContent  = document.getElementById('dlb-content');
+    const toggle      = document.getElementById('dlb-master-toggle');
+    if (!enablePanel || !dlbContent) return;
+    if (enabled) { enablePanel.style.display='none'; dlbContent.style.display='block'; }
+    else         { enablePanel.style.display='block'; dlbContent.style.display='none'; }
+    if (toggle) toggle.checked = enabled;
+}
+function onDLBEnableToggle(checked) { if (checked) { openDLBConfirm(); } else { const t=document.getElementById('dlb-master-toggle'); if(t) t.checked=false; } }
+function openDLBConfirm()  { document.getElementById('dlb-confirm-modal').style.display='flex'; }
+function closeDLBConfirm() { document.getElementById('dlb-confirm-modal').style.display='none'; const t=document.getElementById('dlb-master-toggle'); if(t) t.checked=false; }
+function confirmDLBEnable() {
+    closeDLBConfirm();
+    document.getElementById('dlb-wizard-enable').style.display='none';
+    document.getElementById('dlb-wizard-current').style.display='block';
+    document.getElementById('dlb-wizard-status').style.display='none';
+}
+function dlbWizardContinue() {
+    const amps=parseInt(document.getElementById('dlb-wizard-amps').value,10);
+    const errEl=document.getElementById('dlb-wizard-error');
+    if (!amps||amps<6||amps>200) { errEl.textContent='Please enter a valid current between 6A and 200A.'; errEl.style.display='block'; return; }
+    errEl.style.display='none';
+    document.getElementById('dlb-wizard-current').style.display='none';
+    document.getElementById('dlb-wizard-status').style.display='block';
+    document.getElementById('dlb-dot-1').style.background='#fbbf24';
+    document.getElementById('dlb-dot-2').style.background='#e5e7eb';
+    ws.send(JSON.stringify({action:'ENABLE_DLB',chargerId:selectedChargerId, fuseAmps: amps}));
+    setTimeout(()=>{document.getElementById('dlb-dot-1').style.background='#10b981';document.getElementById('dlb-dot-2').style.background='#fbbf24';},2000);
+    setTimeout(()=>{document.getElementById('dlb-dot-2').style.background='#10b981';const b=document.getElementById('dlb-complete-btn');if(b)b.style.display='block';},9000);
+}
+function completeDLBSetup() { document.getElementById('dlb-wizard-status').style.display='none'; if(selectedChargerId) localStorage.setItem(`dlbEnabled_${selectedChargerId}`,'true'); refreshDLBWizardState(true); }
+function openDisableDLBConfirm()  { document.getElementById('dlb-disable-modal').style.display='flex'; }
+function closeDisableDLBConfirm() { document.getElementById('dlb-disable-modal').style.display='none'; }
+function disableDLBSetup() { closeDisableDLBConfirm(); ws.send(JSON.stringify({action:'DISABLE_DLB',chargerId:selectedChargerId})); if(selectedChargerId) localStorage.setItem(`dlbEnabled_${selectedChargerId}`,'false'); refreshDLBWizardState(false); }
+function saveFuseRating(inp, status) {
+    const amps=parseInt(inp?.value,10);
+    if(!amps||amps<6){if(status){status.textContent='Invalid';status.style.color='#ef4444';}return;}
+    ws.send(JSON.stringify({action:'UPDATE_FUSE_RATING',chargerId:selectedChargerId,fuseAmps:amps}));
+    if(status){status.textContent=`Saved ${amps}A`;status.style.color='#10b981';}
+    setTimeout(()=>closeFuseEdit(),1500);
+}
+function openDLBHelp()  {document.getElementById('dlb-help-modal').style.display='flex';}
+function closeDLBHelp() {document.getElementById('dlb-help-modal').style.display='none';}

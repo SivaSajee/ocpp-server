@@ -48,8 +48,9 @@ function allocatePowerToChargers(chargers) {
         const isNightBoostActive = charger.dlbModes.nightFullSpeed && isNightTime;
 
         if (charger.dlbModes.extremeMode || isNightBoostActive) {
+            // Always cap to the user's configured max — never exceed it, even in Extreme Mode
             targetAmps = charger.maxChargeAmps;
-            modeDescription = charger.dlbModes.extremeMode ? "Extreme Mode" : "Night Full Speed";
+            modeDescription = charger.dlbModes.extremeMode ? `Extreme Mode (capped at ${charger.maxChargeAmps}A)` : `Night Full Speed (capped at ${charger.maxChargeAmps}A)`;
         } else if (charger.dlbModes.pvDynamicBalance) {
             const solarPower = dlb.pvPower || 0;
             const housePower = dlb.homeLoad || 0;
@@ -148,7 +149,7 @@ function startDLBUpdates(chargers) {
                     type: 'dlb',
                     chargerId: id,
                     data: charger.dlbState,
-                    modes: dlbConfig.modes
+                    modes: charger.dlbModes
                 });
 
                 const dlb = charger.dlbState;

@@ -274,45 +274,12 @@ wss.on('connection', (ws, req) => {
             }];
             ws.send(JSON.stringify(readMeasurands));
             console.log("🔍 Reading charger MeterValuesSampledData config (DLB diagnostic)...");
-        }, 4000);
+        }, 4500);
         charger?.pendingTimeouts.push(configTimeout5);
 
-        // ⚡ Enable Z-Beny DLB hardware (vendor-specific keys — CamelCase for firmware 1.2.10)
-        const configTimeout6 = setTimeout(() => {
-            // DLBEnable must be "true" string for firmware 1.2.10 (not "1")
-            ws.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
-                key: "DLBEnable", value: "true"
-            }]));
-            console.log(`⚡ DLB: Enabling hardware DLB (DLBEnable=true)`);
-        }, 5000);
-        charger?.pendingTimeouts.push(configTimeout6);
-
-        const configTimeout7 = setTimeout(() => {
-            ws.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
-                key: "DLBMode", value: CONFIG.DLB_MODE
-            }]));
-            const modeLabels = { '0': 'Grid', '1': 'PV Only', '2': 'Hybrid PV+Grid' };
-            console.log(`⚡ DLB: Setting mode to ${modeLabels[CONFIG.DLB_MODE] || CONFIG.DLB_MODE} (DLBMode=${CONFIG.DLB_MODE})`);
-        }, 5500);
-        charger?.pendingTimeouts.push(configTimeout7);
-
-        const configTimeout8 = setTimeout(() => {
-            ws.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
-                key: "DLBMaxGridCurrent", value: CONFIG.DLB_MAX_GRID_CURRENT
-            }]));
-            console.log(`⚡ DLB: Setting max grid current to ${CONFIG.DLB_MAX_GRID_CURRENT}A (DLBMaxGridCurrent)`);
-        }, 6000);
-        charger?.pendingTimeouts.push(configTimeout8);
-
-        // 📡 Tell charger to send DLB data via DataTransfer every 30s
-        // Key: DLBDataTransferInterval (confirmed Accepted by firmware 1.2.10 — DLBReportInterval is NotSupported)
-        const configTimeout9 = setTimeout(() => {
-            ws.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
-                key: "DLBDataTransferInterval", value: "30"
-            }]));
-            console.log("📡 DLB: Enabling DataTransfer reporting (DLBDataTransferInterval=30s)");
-        }, 6500);
-        charger?.pendingTimeouts.push(configTimeout9);
+        // 🔓 All DLB configuration (App config unlock, Hardware Enable, Breaker Rating, 
+        // PV Max Grid Current, Data Transfer Interval) has been moved to dashboardHandlers.js 
+        // and is now executed strictly when the user clicks 'Enable DLB' on the dashboard.
     }, CONFIG.CONFIG_SETUP_DELAY);
     charger?.pendingTimeouts.push(configTimeout);
 
@@ -354,13 +321,14 @@ wss.on('connection', (ws, req) => {
         } else if (action === 'Heartbeat') {
             handleHeartbeat(ws, uniqueId);
         } else if (action === 'DataTransfer') {
-            // 📦 Z-Beny DLB data via DataTransfer (firmware 1.2.10: vendorId=ZJBENY, messageId=DLB_Status)
+            // 📦 Z-Beny DLB data via DataTransfer
             console.log(`📦 [${chargerId}] DataTransfer received:`);
             console.log(`   vendorId: ${payload?.vendorId}`);
             console.log(`   messageId: ${payload?.messageId}`);
             console.log(`   data: ${JSON.stringify(payload?.data)}`);
 
-            // Try to parse DLB values from the data field
+            // ⚡ DLBType restoration previously occurred here.
+            // Removed because charger is lock-managed by the meter and rejects server overrides.
             try {
                 let dlbPayload = payload?.data;
 
@@ -427,18 +395,62 @@ wss.on('connection', (ws, req) => {
 
                         // Save DLBMode and DLBStatus if present
                         if (dlbPayload.DLBMode) charger.dlbState.dlbMode = dlbPayload.DLBMode;
+                        const prevDlbStatus = charger.dlbState.dlbStatus;
                         if (dlbPayload.DLBStatus) charger.dlbState.dlbStatus = dlbPayload.DLBStatus;
+
+                        // ⚡ DLB Offline Override:
+                        // When the charger's hardware DLB meter goes offline, the charger firmware
+                        // self-limits to 6A regardless of SetChargingProfile. Fix: disable the
+                        // charger's internal DLB and push max current via OCPP profile.
+                        if (dlbPayload.DLBStatus === 'Offline' && prevDlbStatus !== 'Offline') {
+                            const maxAmps = charger.maxChargeAmps || 32;
+                            const powerLimitWatts = maxAmps * 690; // 3-phase: 3 × 230V
+                            console.log(`⚡ [${chargerId}] DLB Offline detected — overriding to ${maxAmps}A (disabling hardware DLB)`);
+
+                            // 1. Disable the charger's internal DLB hardware (releases the 6A cap)
+                            ws.send(JSON.stringify([2, 'config-' + Date.now(), 'ChangeConfiguration', {
+                                key: 'DLBEnabled', value: 'false'
+                            }]));
+
+                            // 2. Push a charging profile at maxChargeAmps so car charges at full speed
+                            setTimeout(() => {
+                                if (charger.socket && charger.socket.readyState === WebSocket.OPEN && charger.isCharging) {
+                                    ws.send(JSON.stringify([2, 'dlb-' + Date.now(), 'SetChargingProfile', {
+                                        connectorId: 1,
+                                        csChargingProfiles: {
+                                            chargingProfileId: 1,
+                                            stackLevel: 0,
+                                            chargingProfilePurpose: 'TxDefaultProfile',
+                                            chargingProfileKind: 'Relative',
+                                            chargingSchedule: {
+                                                chargingRateUnit: 'W',
+                                                chargingSchedulePeriod: [{ startPeriod: 0, limit: powerLimitWatts }]
+                                            }
+                                        }
+                                    }]));
+                                    console.log(`⚡ [${chargerId}] DLB Offline override: SetChargingProfile sent at ${maxAmps}A (${powerLimitWatts}W)`);
+                                }
+                            }, 500);
+
+                        } else if (dlbPayload.DLBStatus === 'Normal' && prevDlbStatus === 'Offline') {
+                            // DLB meter came back online — re-enable hardware DLB
+                            console.log(`✅ [${chargerId}] DLB back Online — re-enabling hardware DLB`);
+                            ws.send(JSON.stringify([2, 'config-' + Date.now(), 'ChangeConfiguration', {
+                                key: 'DLBEnabled', value: 'true'
+                            }]));
+                        }
 
                         const hasData = (gridKwParsed ?? pvKwParsed ?? homeKwParsed ?? gridA ?? pvA ?? homeA ?? gridW ?? pvW ?? homeW) !== null;
 
                         if (hasData) {
                             const evseW = parseKw(rawEvseKw);
+                            if (evseW !== null) charger.dlbState.evsePower = Math.round(evseW * 1000);
                             console.log(`   ✅ DLB parsed → Grid=${charger.dlbState.gridPower}W | PV=${charger.dlbState.pvPower}W | Home=${charger.dlbState.homeLoad}W${evseW !== null ? ` | EVSE=${Math.round(evseW * 1000)}W` : ''} | Mode=${charger.dlbState.dlbMode || '-'}`);
                             broadcastToDashboards({
                                 type: 'dlb',
                                 chargerId,
                                 data: charger.dlbState,
-                                modes: dlbConfig.modes
+                                modes: charger.dlbModes
                             });
                         } else {
                             console.log(`   ⚠️ DataTransfer received but no DLB fields recognized. Raw:`, dlbPayload);

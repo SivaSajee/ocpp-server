@@ -232,7 +232,11 @@
 
         <div id="dlbView" style="display: none;">
             <div class="header-bar">
-                <div class="header-title">Dynamic Load Balance</div>
+                <div>
+                    <div class="header-title">Dynamic Load Balance</div>
+                    <div id="dlb-charger-name"
+                        style="font-size: 12px; color: white; font-weight: 600; margin-top: 2px; display: none;"></div>
+                </div>
                 <button class="back-btn" onclick="openDLBHelp()" title="Help"
                     style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #667eea;">
                     <svg viewBox="0 0 24 24" style="width: 24px; height: 24px;">
@@ -240,6 +244,120 @@
                             d="M11,18H13V16H11V18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,6A4,4 0 0,0 8,10H10A2,2 0 0,1 12,8A2,2 0 0,1 14,10C14,12 11,11.75 11,15H13C13,12.75 16,12.5 16,10A4,4 0 0,0 12,6Z" />
                     </svg>
                 </button>
+            </div>
+
+            <!-- ══════════════════════════════════════════
+                 DLB SETUP WIZARD — Step 0: Enable toggle
+                 ══════════════════════════════════════════ -->
+            <div id="dlb-wizard-enable" class="dlb-wizard-panel" style="display:none;">
+                <div class="dlb-wizard-enable-row">
+                    <div class="dlb-wizard-enable-info">
+                        <div class="dlb-wizard-enable-title">Enable DLB</div>
+                        <div class="dlb-wizard-enable-sub">Activates hardware load balancing on your charger</div>
+                    </div>
+                    <label class="switch dlb-enable-switch">
+                        <input type="checkbox" id="dlb-master-toggle" onchange="onDLBEnableToggle(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="dlb-wizard-hint">
+                    ⚡ Enable to configure your distribution box and start balancing load automatically.
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════
+                 DLB SETUP WIZARD — Step 1: Rated current
+                 ══════════════════════════════════════════ -->
+            <div id="dlb-wizard-current" class="dlb-wizard-panel" style="display:none;">
+                <div class="dlb-wizard-step-label">Step 1 of 2</div>
+                <div class="dlb-wizard-section-title">Distribution Box Rating</div>
+                <div class="dlb-wizard-section-sub">Enter the rated current of your main distribution box (breaker
+                    rating per phase).</div>
+                <div class="dlb-wizard-input-row">
+                    <input type="number" id="dlb-wizard-amps" class="dlb-wizard-input" min="6" max="200" value="32"
+                        placeholder="32">
+                    <span class="dlb-wizard-unit">A / phase</span>
+                </div>
+                <div class="dlb-wizard-presets">
+                    <span class="dlb-preset-chip"
+                        onclick="document.getElementById('dlb-wizard-amps').value=16">16A</span>
+                    <span class="dlb-preset-chip"
+                        onclick="document.getElementById('dlb-wizard-amps').value=25">25A</span>
+                    <span class="dlb-preset-chip"
+                        onclick="document.getElementById('dlb-wizard-amps').value=32">32A</span>
+                    <span class="dlb-preset-chip"
+                        onclick="document.getElementById('dlb-wizard-amps').value=40">40A</span>
+                    <span class="dlb-preset-chip"
+                        onclick="document.getElementById('dlb-wizard-amps').value=63">63A</span>
+                </div>
+                <div id="dlb-wizard-error" class="dlb-wizard-error" style="display:none;"></div>
+                <button class="dlb-wizard-btn" onclick="dlbWizardContinue()">
+                    <span id="dlb-wizard-btn-text">Apply Configuration →</span>
+                </button>
+            </div>
+
+            <!-- ══════════════════════════════════════════
+                 DLB SETUP WIZARD — Step 2: Status screen
+                 ══════════════════════════════════════════ -->
+            <div id="dlb-wizard-status" class="dlb-wizard-panel" style="display:none;">
+                <div class="dlb-wizard-status-title">Current system status:</div>
+                <div class="dlb-status-card" id="dlb-status-row-1">
+                    <span class="dlb-status-text">DLB has been activated.</span>
+                    <span class="dlb-status-dot" id="dlb-dot-1"></span>
+                </div>
+                <div class="dlb-status-card" id="dlb-status-row-2">
+                    <span class="dlb-status-text">The charging rules have taken effect</span>
+                    <span class="dlb-status-dot" id="dlb-dot-2"></span>
+                </div>
+                <button class="dlb-wizard-btn dlb-wizard-btn-complete" id="dlb-complete-btn"
+                    onclick="completeDLBSetup()" style="display:none;">
+                    Complete
+                </button>
+            </div>
+
+            <!-- ══════════════════════════════════════════
+                 DLB CONFIRM MODAL
+                 ══════════════════════════════════════════ -->
+            <div class="modal-overlay" id="dlb-confirm-modal" style="display:none;">
+                <div class="timer-modal" style="max-width:340px;">
+                    <div class="modal-header">
+                        <div class="modal-title">Enable DLB?</div>
+                        <div class="modal-close" onclick="closeDLBConfirm()">×</div>
+                    </div>
+                    <div style="padding:0 20px 8px;font-size:14px;color:#4b5563;line-height:1.6;">
+                        This will apply DLB configuration to your charger via OCPP
+                        <strong>ChangeConfiguration</strong> commands. Make sure the
+                        charger is online and ready.
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn modal-btn-cancel" onclick="closeDLBConfirm()">Cancel</button>
+                        <button class="modal-btn modal-btn-set" onclick="confirmDLBEnable()">Confirm</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════
+                 DLB DISABLE CONFIRM MODAL
+                 ══════════════════════════════════════════ -->
+            <div class="modal-overlay" id="dlb-disable-modal" style="display:none;">
+                <div class="timer-modal" style="max-width:340px;">
+                    <div class="modal-header">
+                        <div class="modal-title" style="color:#ef4444;-webkit-text-fill-color:#ef4444;">Disable DLB?
+                        </div>
+                        <div class="modal-close" onclick="closeDisableDLBConfirm()">×</div>
+                    </div>
+                    <div style="padding:0 20px 8px;font-size:14px;color:#4b5563;line-height:1.6;">
+                        This will send <strong>DLBEnabled = false</strong> to your charger
+                        and reset the setup wizard. You can re-enable DLB at any time.
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn modal-btn-cancel" onclick="closeDisableDLBConfirm()">Keep
+                            Active</button>
+                        <button class="modal-btn"
+                            style="background:#ef4444;color:white;box-shadow:0 4px 12px rgba(239,68,68,0.3);"
+                            onclick="disableDLBSetup()">Disable</button>
+                    </div>
+                </div>
             </div>
 
             <div id="dlb-offline-overlay"
@@ -259,6 +377,15 @@
             </div>
 
             <div id="dlb-content">
+                <!-- Disable DLB status row -->
+                <div class="dlb-active-row">
+                    <div class="dlb-active-label">
+                        <span class="dlb-active-dot"></span>
+                        DLB Active
+                    </div>
+                    <button class="dlb-disable-btn" onclick="openDisableDLBConfirm()">Disable DLB</button>
+                </div>
+
                 <!-- Hub and Spoke Visualization -->
                 <div class="hub-viz-container">
                     <div class="hub-viz-inner">
@@ -287,17 +414,35 @@
                                 <animateMotion id="anim-grid-export" dur="2s" repeatCount="indefinite"
                                     path="M 185 190 C 185 150, 90 195, 90 145" />
                             </circle>
-                            <circle id="dot-pv" class="flow-dot dot-pv" r="5">
-                                <animateMotion id="anim-pv" dur="2s" repeatCount="indefinite"
+                            <!-- PV Generate: PV -> Hub (negative pvPower = generating) -->
+                            <circle id="dot-pv-generate" class="flow-dot dot-pv" r="5">
+                                <animateMotion id="anim-pv-generate" dur="2s" repeatCount="indefinite"
                                     path="M 310 145 C 310 195, 215 150, 215 190" />
                             </circle>
-                            <circle id="dot-charger" class="flow-dot dot-charger" r="5">
-                                <animateMotion id="anim-charger" dur="2s" repeatCount="indefinite"
+                            <!-- PV Consume: Hub -> PV (positive pvPower = consuming/battery charging) -->
+                            <circle id="dot-pv-consume" class="flow-dot dot-pv" r="5">
+                                <animateMotion id="anim-pv-consume" dur="2s" repeatCount="indefinite"
+                                    path="M 215 190 C 215 150, 310 195, 310 145" />
+                            </circle>
+                            <!-- Charger Consume: Hub -> Charger (positive = charging) -->
+                            <circle id="dot-charger-consume" class="flow-dot dot-charger" r="5">
+                                <animateMotion id="anim-charger-consume" dur="2s" repeatCount="indefinite"
                                     path="M 185 290 C 185 330, 90 285, 90 335" />
                             </circle>
-                            <circle id="dot-home" class="flow-dot dot-home" r="5">
-                                <animateMotion id="anim-home" dur="2s" repeatCount="indefinite"
+                            <!-- Charger Export (V2G): Charger -> Hub (negative = discharging to grid) -->
+                            <circle id="dot-charger-export" class="flow-dot dot-charger" r="5">
+                                <animateMotion id="anim-charger-export" dur="2s" repeatCount="indefinite"
+                                    path="M 90 335 C 90 285, 185 330, 185 290" />
+                            </circle>
+                            <!-- Home Consume: Hub -> Home (positive = consuming) -->
+                            <circle id="dot-home-consume" class="flow-dot dot-home" r="5">
+                                <animateMotion id="anim-home-consume" dur="2s" repeatCount="indefinite"
                                     path="M 215 290 C 215 330, 310 285, 310 335" />
+                            </circle>
+                            <!-- Home Export: Home -> Hub (negative = home battery/generation) -->
+                            <circle id="dot-home-export" class="flow-dot dot-home" r="5">
+                                <animateMotion id="anim-home-export" dur="2s" repeatCount="indefinite"
+                                    path="M 310 335 C 310 285, 215 330, 215 290" />
                             </circle>
                         </svg>
 
@@ -632,7 +777,11 @@
 
         <div id="settingView" style="display: none; background: #f3f4f6; min-height: 100vh; padding: 20px;">
             <div class="header-bar">
-                <div class="header-title">Settings</div>
+                <div>
+                    <div class="header-title">Settings</div>
+                    <div id="setting-charger-name"
+                        style="font-size: 12px; color: white; font-weight: 600; margin-top: 2px; display: none;"></div>
+                </div>
             </div>
 
             <div style="padding-bottom: 100px;">

@@ -232,7 +232,28 @@ function handleMessage(message) {
     // Handle ChangeConfiguration
     else if (action === 'ChangeConfiguration') {
         console.log(`⚙️ ChangeConfiguration: ${payload.key} = ${payload.value}`);
+        
+        // Specific handling for NetWorkSetting
+        if (payload.key === 'NetWorkSetting') {
+            if (payload.value === '5') console.log('📶 SIMULATOR: Switching to Offline (Plug & Play) mode');
+            if (payload.value === '6') console.log('📶 SIMULATOR: Switching to Offline (RFID) mode');
+        }
+
         ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
+    }
+
+    // Handle Reset
+    else if (action === 'Reset') {
+        const type = payload.type || 'Soft';
+        console.log(`🔄 Reset requested: ${type}`);
+        ws.send(JSON.stringify([3, uniqueId, { status: 'Accepted' }]));
+        
+        // Simulate reboot
+        console.log('🔌 SIMULATOR: Rebooting in 2 seconds...');
+        setTimeout(() => {
+            console.log('🔌 SIMULATOR: Closing connection for reboot');
+            ws.close();
+        }, 1000);
     }
 
     // Handle GetConfiguration

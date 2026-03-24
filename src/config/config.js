@@ -25,10 +25,14 @@ const CONFIG = {
     STOP_RESET_DELAY: 2500,       // Delay before soft reset (ms)
     CONFIG_SETUP_DELAY: 2000,     // Delay before config setup (ms)
 
-    // Z-Beny DLB Hardware (vendor-specific ChangeConfiguration keys)
-    DLB_ENABLE: '1',             // '1' = on, '0' = off
-    DLB_MODE: '0',               // '0'=Grid, '1'=PV Only, '2'=Hybrid PV+Grid
-    DLB_MAX_GRID_CURRENT: '60'   // House main fuse (Amps) — matches MAIN_FUSE_AMPS
+    // Z-Beny DLB Hardware (vendor-specific ChangeConfiguration keys — firmware 1.2.11)
+    DLB_ENABLED: 'true',                    // 'true' = on, 'false' = off
+    DLB_TYPE: '1',                          // '0'=Grid Only, '1'=Solar Hybrid (accepted by BCP-A2N-P), '2'=PV Only, '3'=NewSolar (rejected by this charger)
+    DLB_NORMAL_MODE_MAX_CURRENT: '32',      // Breaker rating per phase (A)
+    DLB_PV_MODE_MAX_GRID_CURRENT: '99',     // Max grid current in PV/hybrid mode (A)
+    DLB_DATA_TRANSFER: 'true',              // Master switch for real-time reporting
+    DLB_DATA_TRANSFER_INTERVAL: '30',       // Telemetry push interval (seconds)
+    DLB_DATA_TRANSFER_ANYTIME_ENABLED: 'true' // Enable reporting 24/7 even when idle
 };
 
 module.exports = { CONFIG };

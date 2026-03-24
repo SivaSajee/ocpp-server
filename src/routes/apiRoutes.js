@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { getDB, getSessionsByPeriod, saveChargerSettings, loadChargerSettings } = require('../db/database');
-const { toIST } = require('../utils/utils');
+const { toIST, getLocalIP } = require('../utils/utils');
 const { dlbConfig, calculateLoadBalance, allocatePowerToChargers } = require('../services/dlbService');
-const { sendUpdateFirmware, sendLEDBrightnessControl, sendSpotTariffConfig, checkAllChargersBrightness } = require('../handlers/ocppHandlers');
+const { sendUpdateFirmware, sendLEDBrightnessControl, sendSpotTariffConfig, sendDLBHardwareConfig, checkAllChargersBrightness } = require('../handlers/ocppHandlers');
 const {
     chargers,
     getCharger,
@@ -24,6 +24,11 @@ async function handleRequest(req, res) {
     // Serve static files (CSS/JS)
     if (req.url.startsWith('/css/') || req.url.startsWith('/js/')) {
         return serveStaticFile(req, res);
+    }
+
+    // Serve Firmware files
+    if (req.url.startsWith('/firmware/')) {
+        return serveFirmwareFile(req, res);
     }
 
     // API endpoints
@@ -93,6 +98,18 @@ async function handleRequest(req, res) {
 
     if (req.url === '/api/settings/rfid/remove' && req.method === 'POST') {
         return handleRemoveRFIDTag(req, res);
+    }
+
+    if (req.url === '/api/dlb/hardware-config' && req.method === 'POST') {
+        return handleDLBHardwareConfig(req, res);
+    }
+
+    if (req.url.startsWith('/api/dlb/configured') && req.method === 'GET') {
+        return handleGetDLBConfigured(req, res);
+    }
+
+    if (req.url === '/api/dlb/configured' && req.method === 'POST') {
+        return handleSetDLBConfigured(req, res);
     }
 
     // Default response
@@ -295,6 +312,7 @@ function handleDLBStatus(req, res) {
     res.end(JSON.stringify({
         ...currentState,
         config: charger.dlbModes,
+        dlbEnabled: (charger.settings && charger.settings.dlbEnabled) === true,
         mainFuseAmps: (charger.settings && charger.settings.mainFuseAmps) || dlbConfig.mainFuseAmps,
         gridCapacity: dlbConfig.gridCapacity,
         pvCapacity: dlbConfig.pvCapacity
@@ -342,6 +360,10 @@ function handleDLBConfig(req, res) {
             }
 
             console.log(`⚙️ DLB Config Updated for ${chargerId}:`, charger.dlbModes);
+            
+            if (!charger.settings) charger.settings = {};
+            charger.settings.dlbModes = charger.dlbModes;
+            saveChargerSettings(chargerId, charger.settings);
 
             broadcastToDashboards({
                 type: 'dlbConfig',
@@ -417,6 +439,13 @@ function handleSetPowerLimit(req, res) {
 
             charger.maxChargeAmps = newLimit;
             console.log(`⚙️ Power Limit Updated for ${chargerId}: ${newLimit}A`);
+
+            // Always attempt to clear the persistent UserCurrentLimit ceiling
+            if (charger.socket && charger.socket.readyState === 1) {
+                charger.socket.send(JSON.stringify([2, "config-" + Date.now(), "ChangeConfiguration", {
+                    key: "UserCurrentLimit", value: String(newLimit)
+                }]));
+            }
 
             if (charger.isCharging) {
                 allocatePowerToChargers(chargers);
@@ -615,45 +644,84 @@ function handleSetChargerSettings(req, res) {
 
 // API: Get firmware repositories
 function handleGetFirmwareRepositories(req, res) {
-    // Simulate firmware repository with different versions available
+    const localIP = getLocalIP();
+    const firmwareDir = path.join(__dirname, '../../firmware');
+    
+    // 1. Start with official Z-Beny repository (from user requirements)
     const repositories = [
         {
-            name: "Official Stable",
-            description: "Production-ready firmware releases",
+            id: "zbeny-official",
+            name: "Z-Beny Official",
+            description: "Direct links to Z-Beny manufacturer firmware",
             versions: [
                 {
-                    version: "v2.1.8-stable",
-                    url: "https://firmware.evcharger.com/releases/v2.1.8/firmware.bin",
-                    releaseDate: "2026-02-10",
-                    changelog: "Bug fixes, improved charging efficiency, security patches",
-                    size: "4.2 MB"
-                },
-                {
-                    version: "v2.1.7-stable",
-                    url: "https://firmware.evcharger.com/releases/v2.1.7/firmware.bin",
-                    releaseDate: "2026-01-15",
-                    changelog: "Enhanced DLB algorithms, OCPP improvements",
-                    size: "4.1 MB"
-                }
-            ]
-        },
-        {
-            name: "Beta Channel",
-            description: "Preview releases with latest features",
-            versions: [
-                {
-                    version: "v2.2.0-beta3",
-                    url: "https://firmware.evcharger.com/beta/v2.2.0-beta3/firmware.bin",
-                    releaseDate: "2026-02-14",
-                    changelog: "New smart charging features, improved UI, experimental V2G support",
+                    version: "v1.0.26",
+                    url: "http://106.15.78.131/BCP-A2N-P_SW1_0_26_HW1.bin",
+                    releaseDate: "2024-05-10",
+                    changelog: "Official Z-Beny BCP-A2N-P Firmware (SW1.0.26 / HW1)",
                     size: "4.5 MB"
                 }
             ]
         }
     ];
 
+    // 2. Scan local /firmware folder for any .bin files
+    const localVersions = [];
+    if (!fs.existsSync(firmwareDir)) {
+        fs.mkdirSync(firmwareDir, { recursive: true });
+    }
+
+    try {
+        const files = fs.readdirSync(firmwareDir);
+        files.forEach(file => {
+            if (file.endsWith('.bin')) {
+                const stats = fs.statSync(path.join(firmwareDir, file));
+                localVersions.push({
+                    version: file.replace('.bin', ''),
+                    url: `http://${localIP}:${PORT}/firmware/${file}`,
+                    releaseDate: stats.mtime.toISOString().split('T')[0],
+                    changelog: `Local file: ${file}`,
+                    size: (stats.size / (1024 * 1024)).toFixed(1) + " MB"
+                });
+            }
+        });
+    } catch (err) {
+        console.error("❌ Error scanning local firmware directory:", err.message);
+    }
+
+    if (localVersions.length > 0) {
+        repositories.push({
+            id: "local",
+            name: "Local Files (Laptop)",
+            description: `Firmware files found in your ./firmware/ folder`,
+            versions: localVersions
+        });
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ repositories }));
+}
+
+// Serve firmware files from local directory
+function serveFirmwareFile(req, res) {
+    const filename = req.url.replace('/firmware/', '');
+    const filePath = path.join(__dirname, '../../firmware', filename);
+
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        res.writeHead(404);
+        res.end("Firmware file not found");
+        return;
+    }
+
+    const stat = fs.statSync(filePath);
+    res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Content-Disposition': `attachment; filename="${filename}"`
+    });
+
+    const readStream = fs.createReadStream(filePath);
+    readStream.pipe(res);
 }
 
 // API: Initiate firmware update
@@ -681,9 +749,9 @@ function handleFirmwareUpdate(req, res) {
             }
 
             // Send UpdateFirmware command to charger
-            const success = sendUpdateFirmware(chargerId, firmwareUrl);
+            const result = sendUpdateFirmware(chargerId, firmwareUrl);
 
-            if (success) {
+            if (result.success) {
                 console.log(`📦 [${chargerId}] Firmware update initiated: ${version} from ${firmwareUrl}`);
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -694,13 +762,14 @@ function handleFirmwareUpdate(req, res) {
                     url: firmwareUrl
                 }));
             } else {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: false,
-                    error: 'Failed to send update command to charger'
+                    error: result.error || 'Failed to initiate firmware update'
                 }));
             }
         } catch (error) {
+            console.error('❌ Error parsing firmware update request:', error.message);
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Invalid JSON' }));
         }
@@ -740,26 +809,37 @@ function handleChargerDisconnect(req, res) {
                 return;
             }
 
-            console.log(`🔄 Disconnecting charger ${chargerId} for Bluetooth mode switch: ${reason || 'User requested'}`);
+            console.log(`🔄 Switching charger ${chargerId} to Bluetooth mode (NetWorkSetting: 5): ${reason || 'User requested'}`);
 
-            // Close WebSocket connection if exists
-            if (charger.socket && charger.socket.readyState === 1) {
-                charger.socket.close(1000, 'Switching to Bluetooth mode');
+            // Send ChangeConfiguration command for NetWorkSetting (5 = Offline/Bluetooth)
+            const ws = charger.socket;
+            if (ws && ws.readyState === 1) {
+                const configMsgId = `mode-switch-config-${Date.now()}`;
+                const configMsg = [2, configMsgId, 'ChangeConfiguration', { 
+                    key: 'NetWorkSetting', 
+                    value: '5' 
+                }];
+                ws.send(JSON.stringify(configMsg));
+                console.log(`📤 Sent NetWorkSetting: 5 to ${chargerId} (ID: ${configMsgId})`);
+            } else {
+                console.error(`❌ Cannot send command: Charger ${chargerId} is not connected or socket unavailable`);
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Charger not connected' }));
+                return;
             }
 
-            // Update charger status to offline
-            charger.status = 'Offline';
-            charger.isCharging = false;
+            // Sync UI locally for now - final offline state will be broadcasted after disconnection
+            charger.status = 'Disconnecting...';
 
-            // Broadcast status update to dashboard
+            // Broadcast pending status update to dashboard
             broadcastToDashboards({
                 type: 'status',
                 chargerId: chargerId,
-                status: 'Offline'
+                status: 'Disconnecting...'
             });
 
-            // Log disconnection
-            console.log(`✅ Charger ${chargerId} disconnected successfully for Bluetooth mode`);
+            // Log initiation
+            console.log(`✅ Transition initiated for ${chargerId}`);
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
@@ -872,8 +952,135 @@ async function handleRemoveRFIDTag(req, res) {
     });
 }
 
+// API: Get whether DLB has been set up for a charger
+async function handleGetDLBConfigured(req, res) {
+    const urlParams = new URL('http://x' + req.url).searchParams;
+    const chargerId = urlParams.get('chargerId');
+
+    if (!chargerId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing chargerId' }));
+        return;
+    }
+
+    const charger = getCharger(chargerId);
+    const configured = !!(charger?.settings?.dlbConfigured);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ configured }));
+}
+
+// API: Mark DLB as configured (or unconfigured) for a charger — persisted to MongoDB
+function handleSetDLBConfigured(req, res) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        try {
+            const { chargerId, configured } = JSON.parse(body);
+            if (!chargerId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing chargerId' }));
+                return;
+            }
+
+            const charger = getCharger(chargerId);
+            if (!charger) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Charger not found' }));
+                return;
+            }
+
+            charger.settings.dlbConfigured = configured !== false; // default true
+            await saveChargerSettings(chargerId, charger.settings);
+            console.log(`💾 [${chargerId}] DLB configured flag saved: ${charger.settings.dlbConfigured}`);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, configured: charger.settings.dlbConfigured }));
+        } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        }
+    });
+}
+
+// API: Send DLB hardware configuration via OCPP ChangeConfiguration
+function handleDLBHardwareConfig(req, res) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+        try {
+            const data = body ? JSON.parse(body) : {};
+            const chargerId = data.chargerId;
+
+            if (!chargerId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'chargerId is required' }));
+                return;
+            }
+
+            const charger = getCharger(chargerId);
+            if (!charger) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Charger not found' }));
+                return;
+            }
+
+            // Build options — caller may override defaults, otherwise use per-charger values
+            const options = {
+                dlbEnabled: data.dlbEnabled !== undefined ? data.dlbEnabled : true,
+                // Use the charger's configured max current, NOT a hardcoded 32A default.
+                // This ensures DLB hardware chip honours the user's max current setting.
+                normalModeMaxCurrent: data.normalModeMaxCurrent !== undefined
+                    ? data.normalModeMaxCurrent
+                    : (charger.maxChargeAmps || 32),
+                dlbType: data.dlbType !== undefined ? data.dlbType : 1,
+                pvModeMaxGridCurrent: data.pvModeMaxGridCurrent !== undefined ? data.pvModeMaxGridCurrent : 99,
+                dataTransferInterval: data.dataTransferInterval !== undefined ? data.dataTransferInterval : 30
+            };
+
+            // disableOnly: just send DLBEnabled=false, skip all other commands
+            if (data.disableOnly) {
+                const ws = charger.ws;
+                if (!ws || ws.readyState !== 1) {
+                    res.writeHead(503, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Charger not connected' }));
+                    return;
+                }
+                const msgId = `dlb-disable-${Date.now()}`;
+                ws.send(JSON.stringify([2, msgId, 'ChangeConfiguration', { key: 'DLBEnabled', value: 'false' }]));
+                console.log(`⛔ [${chargerId}] DLBEnabled=false sent`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, sent: 'DLBEnabled=false' }));
+                return;
+            }
+
+            console.log(`⚙️ [${chargerId}] DLB Hardware Config requested:`, options);
+
+            const success = sendDLBHardwareConfig(chargerId, options);
+
+            if (success) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    message: `DLB hardware configuration sent to ${chargerId}`,
+                    config: options
+                }));
+            } else {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: 'Charger is not connected or socket unavailable'
+                }));
+            }
+        } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        }
+    });
+}
+
 module.exports = {
     handleRequest,
     handleAddRFIDTag,
-    handleRemoveRFIDTag
+    handleRemoveRFIDTag,
+    handleDLBHardwareConfig
 };
